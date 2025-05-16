@@ -21,9 +21,11 @@ It provides tools to explore the hidden structure of economies through:
 
 ---
 
-## 🛠️ Installation
+## 📦 Installation
+
+### 🔄 From GitHub (latest version)
+
+> ⚠️ Requires Python ≥ 3.0
 
 ```bash
-git clone https://github.com/EFC-data/fermi.git
-cd fermi
-pip install -e .
+pip install git+https://github.com/EFC-data/fermi.git

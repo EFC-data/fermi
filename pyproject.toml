@@ -1,30 +1,36 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "fermi"
 version = "0.1.0"
 description = "FitnEss Relatedness and other MetrIcs"
-authors = [
-    { name="EFC Lab", email="info@efc.lab" }
-]
 readme = "README.md"
-requires-python = ">=3.9"
 license = {text = "MIT"}
-dependencies = [
-    "numpy>=2.0",
-    "pandas",
-    "scikit-learn>=1.4.2",
-    "scipy",
-    "matplotlib",
-    "seaborn",
-    "bokeh",
-    "tqdm"
+requires-python = ">=3.9"
+author = "Aurelio Patelli, Riccardo Piombo, Matteo Straccamore, Lorenzo Buffa, Daniele Cirulli, Filippo Santoro, Valeria Secchini, Dario Mazzilli"
+author-email = "efcdata@cref.it"
+
+authors = [
+  { name = "Aurelio Patelli", email = "aurelio.patelli@cref.it" },
+  { name = "Riccardo Piombo", email = "riccardo.piombo@cref.it" },
+  { name = "Matteo Straccamore", email = "matteo.straccamore@cref.it" },
+  { name = "Lorenzo Buffa", email = "lorenzo.buffa@cref.it" },
+  { name = "Daniele Cirulli", email = "daniele.cirulli@cref.it" },
+  { name = "Filippo Santoro", email = "filippo.santoro@cref.it" },
+  { name = "Valeria Secchini", email = "valeria.secchini@cref.it" },
+  { name = "Dario Mazzilli", email = "dario.mazzilli@cref.it" },
 ]
 
-[tool.setuptools.packages.find]
-where = ["fermi"]
+dependencies = [
+  "numpy >=2.0",
+  "pandas",
+  "scikit-learn >=1.4.2",
+  "scipy",
+  "matplotlib",
+  "seaborn",
+  "bokeh",
+  "tqdm"
+]
 
-[project.urls]
-"Homepage" = "https://github.com/EFC-data/fermi"
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+

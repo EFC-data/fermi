@@ -1,4 +1,4 @@
-# FERMI
+# fermi
 
 **FitnEss Relatedness and other MetrIcs**  
 

@@ -43,6 +43,7 @@ tqdm
 
 ⚠️ Compatibility Note
 FERMI currently requires NumPy ≥ 2.0, which may conflict with some libraries (e.g. tensorflow, numba, jax, etc.).
+
 To avoid issues, consider installing FERMI in a virtual environment:
 
 ```bash

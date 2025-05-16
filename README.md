@@ -1,6 +1,6 @@
 # fermi
 
-**The FitnEss, The Relatedness and The other MetrIcs**  
+The **F**itn**E**ss, The **R**elatedness and The other **M**etr**I**cs
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](#)

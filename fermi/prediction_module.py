@@ -455,7 +455,7 @@ class SPSbForecaster:
         print(state_tau_plus_dt)
         
         X = state_tau.values
-        dX = ( - ).values
+        dX = X #WRONG TO BE FIXED 
         
         print("\n",dX)
         return X, dX

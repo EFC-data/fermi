@@ -5,8 +5,6 @@ description = "FitnEss Relatedness and other MetrIcs"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
-author = "Aurelio Patelli, Riccardo Piombo, Matteo Straccamore, Lorenzo Buffa, Daniele Cirulli, Filippo Santoro, Valeria Secchini, Dario Mazzilli"
-author-email = "efcdata@cref.it"
 
 authors = [
   { name = "Aurelio Patelli", email = "aurelio.patelli@cref.it" },

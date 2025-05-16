@@ -1,0 +1,7 @@
+# To install all development dependencies (including testing and linting tools):
+# pip install -r requirements-dev.txt
+
+-r requirements.txt
+pytest
+black
+ruff

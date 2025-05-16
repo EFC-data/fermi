@@ -43,7 +43,6 @@ tqdm
 ```
 ⚠️ Compatibility Note
 FERMI currently requires NumPy ≥ 2.0, which may conflict with some libraries (e.g. tensorflow, numba, jax, etc.).
-
 To avoid issues, consider installing FERMI in a virtual environment:
 
 ```bash
@@ -53,7 +52,6 @@ pip install git+https://github.com/EFC-data/fermi.git
 ```
 
 🧪 Development
-
 To install FERMI in editable mode with dev dependencies:
 
 ```bash

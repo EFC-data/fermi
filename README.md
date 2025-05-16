@@ -29,7 +29,6 @@ It provides tools to explore the hidden structure of economies through:
 
 ```bash
 pip install git+https://github.com/EFC-data/fermi.git
-```bash
 
 This will install fermi along with its core dependencies:
 

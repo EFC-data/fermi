@@ -29,3 +29,46 @@ It provides tools to explore the hidden structure of economies through:
 
 ```bash
 pip install git+https://github.com/EFC-data/fermi.git
+
+This will install fermi along with its core dependencies:
+
+numpy ≥ 2.0 (⚠ may cause incompatibilities — see below)
+pandas
+scikit-learn ≥ 1.4.2
+scipy
+matplotlib
+seaborn
+bokeh
+tqdm
+
+
+⚠ Compatibility Note
+FERMI currently requires NumPy ≥ 2.0, which may conflict with some libraries (e.g. tensorflow, numba, jax, etc.).
+To avoid issues, consider installing FERMI in a virtual environment:
+
+```bash
+python -m venv fermi-env
+source fermi-env/bin/activate
+pip install git+https://github.com/EFC-data/fermi.git
+
+
+🧪 Development
+To install FERMI in editable mode with dev dependencies:
+
+```bash
+git clone https://github.com/EFC-data/fermi.git
+cd fermi
+
+# core install
+pip install -e .
+
+# dev tools (testing, linting, etc.)
+pip install -r requirements-dev.txt
+
+
+Then run the test suite:
+
+pytest
+
+
+

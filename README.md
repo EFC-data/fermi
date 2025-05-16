@@ -29,7 +29,7 @@ It provides tools to explore the hidden structure of economies through:
 
 ```bash
 pip install git+https://github.com/EFC-data/fermi.git
-
+```
 This will install fermi along with its core dependencies:
 
 numpy ≥ 2.0 (⚠ may cause incompatibilities — see below)
@@ -50,7 +50,7 @@ To avoid issues, consider installing FERMI in a virtual environment:
 python -m venv fermi-env
 source fermi-env/bin/activate
 pip install git+https://github.com/EFC-data/fermi.git
-
+```
 
 🧪 Development
 To install FERMI in editable mode with dev dependencies:
@@ -64,11 +64,10 @@ pip install -e .
 
 # dev tools (testing, linting, etc.)
 pip install -r requirements-dev.txt
-
-
+```
 Then run the test suite:
-
+```bash
 pytest
-
+```
 
 

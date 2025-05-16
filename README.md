@@ -53,6 +53,7 @@ pip install git+https://github.com/EFC-data/fermi.git
 ```
 
 🧪 Development
+
 To install FERMI in editable mode with dev dependencies:
 
 ```bash

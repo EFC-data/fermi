@@ -1,0 +1,52 @@
+# ⚙️ Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 📦 Virtual environments
+.env/
+.venv/
+env/
+venv/
+
+# 📊 Jupyter / dati
+*.ipynb
+.ipynb_checkpoints/
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.json
+*.pickle
+*.pkl
+*.feather
+*.parquet
+*.h5
+
+# 🗃 IDEs & editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 📄 Log & output
+*.log
+*.out
+*.tmp
+
+# 💾 Sistema operativo
+.DS_Store
+Thumbs.db
+
+# 📄 Pytest & coverage
+.cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/

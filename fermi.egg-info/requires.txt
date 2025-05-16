@@ -1,5 +1,8 @@
 bokeh
-numpy
+numpy>=2.0
 pandas
-scikit-learn
+scikit-learn>=1.4.2
 scipy
+matplotlib
+seaborn
+tqdm

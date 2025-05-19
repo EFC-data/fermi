@@ -18,17 +18,17 @@ authors = [
 ]
 
 dependencies = [
-  "numpy >=2.0",
-  "pandas",
-  "scikit-learn >=1.4.2",
-  "scipy",
-  "matplotlib",
-  "seaborn",
-  "bokeh",
-  "tqdm"
+  "numpy>=1.24",
+  "pandas>=1.5",
+  "matplotlib>=3.5",
+  "scipy>=1.9",
+  "networkx>=2.6",
+  "bokeh>=2.4",
+  "tqdm>=4.64",
+  "scikit-learn>=1.2",
+  "bicm>=3.3.1",
 ]
 
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-

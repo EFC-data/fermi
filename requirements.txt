@@ -1,0 +1,11 @@
+# To install only the core dependencies for using the package:
+# pip install -r requirements.txt
+
+bokeh
+numpy>=2.0
+pandas
+scikit-learn>=1.4.2
+scipy
+matplotlib
+seaborn
+tqdm

@@ -22,15 +22,8 @@ It provides tools to explore the hidden structure of economies through:
 ---
 
 ## 📦 Installation
-
-### 🔄 From GitHub (latest version)
-
 > ⚠️ Requires Python ≥ 3.0
-
-```bash
-pip install git+https://github.com/EFC-data/fermi.git
-```
-This will install fermi along with its core dependencies:
+To correnctly install and use the package, you need to have
 ```bash
 numpy ≥ 1.24
 pandas ≥ 1.5
@@ -43,21 +36,17 @@ tqdm
 networkx ≥ 2.6
 bicm ≥ 3.3.1
 ```
-
-🧪 Development
-To try FERMI, install it in a virtual environment:
-
+To install prerequisites in a virtual environment you can use the pip installation:
 ```bash
 python -m venv fermi-env
 source fermi-env/bin/activate
 git clone https://github.com/EFC-data/fermi.git
 cd fermi
-
-# Update all packages and dependencies (requirements.txt)
 pip install -r requirements.txt
-
-# core install
-pip install -e .
 ```
-
-
+To use fermi on colab write instead:
+```bash
+!git clone https://github.com/EFC-data/fermi.git
+%cd fermi
+!pip install -r requirements.txt
+```

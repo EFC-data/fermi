@@ -1,5 +1,5 @@
 README.md
-setup.py
+pyproject.toml
 fermi/__init__.py
 fermi/comparative_advantage.py
 fermi/economic_fitness_complexity.py
@@ -10,5 +10,8 @@ fermi/validation_metrics.py
 fermi.egg-info/PKG-INFO
 fermi.egg-info/SOURCES.txt
 fermi.egg-info/dependency_links.txt
+fermi.egg-info/requirements-dev.txt
+fermi.egg-info/requirements.txt
 fermi.egg-info/requires.txt
 fermi.egg-info/top_level.txt
+tests/test_all_modules.py

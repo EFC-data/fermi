@@ -32,31 +32,29 @@ pip install git+https://github.com/EFC-data/fermi.git
 ```
 This will install fermi along with its core dependencies:
 ```bash
-numpy ≥ 2.0 (⚠️ may cause incompatibilities — see below)
-pandas
-scikit-learn ≥ 1.4.2
-scipy
-matplotlib
+numpy ≥ 1.24
+pandas ≥ 1.5
+scikit-learn ≥ 1.2
+scipy ≥ 1.9
+matplotlib ≥ 3.5
 seaborn
-bokeh
+bokeh ≥ 2.4
 tqdm
+networkx ≥ 2.6
+bicm ≥ 3.3.1
 ```
-⚠️ Compatibility Note
-FERMI currently requires NumPy ≥ 2.0, which may conflict with some libraries (e.g. tensorflow, numba, jax, etc.).
-To avoid issues, consider installing FERMI in a virtual environment:
+
+🧪 Development
+To try FERMI, install it in a virtual environment:
 
 ```bash
 python -m venv fermi-env
 source fermi-env/bin/activate
-pip install git+https://github.com/EFC-data/fermi.git
-```
-
-🧪 Development
-To install FERMI in editable mode with dev dependencies:
-
-```bash
 git clone https://github.com/EFC-data/fermi.git
 cd fermi
+
+# Update all packages and dependencies (requirements.txt)
+pip install --upgrade -r requirements.txt
 
 # core install
 pip install -e .

@@ -54,7 +54,7 @@ git clone https://github.com/EFC-data/fermi.git
 cd fermi
 
 # Update all packages and dependencies (requirements.txt)
-pip install --upgrade -r requirements.txt
+pip install -r requirements.txt
 
 # core install
 pip install -e .

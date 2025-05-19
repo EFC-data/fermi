@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
+from pathlib import Path
 from typing import Any, List, Tuple, Union
 from scipy.sparse import csr_matrix
 
@@ -39,9 +40,9 @@ class RawMatrixProcessor:
         self.global_row_labels = []  # Combined list of all unique row labels
         self.global_col_labels = []  # Combined list of all unique column labels
 
-    def load_to_sparse(
+    def load_as_sparse(
         self,
-        input_data: Union[str, pd.DataFrame, np.ndarray, List[Any]],
+        input_data: Union[str, Path, pd.DataFrame, np.ndarray, List[Any]],
         return_labels: bool = False
         ) -> Union[csr_matrix, Tuple[csr_matrix, List[str], List[str]]]:
         
@@ -60,27 +61,24 @@ class RawMatrixProcessor:
           - scipy.sparse.csr_matrix 
               optionally row and column labels if return_labels is True
         """
-        if isinstance(input_data, str) and os.path.exists(input_data):
-            # If input is a file path, read it as a DataFrame
-            df = self._read_file(input_data)
-            matrix = sp.csr_matrix(df.values)
-            if return_labels:
-                return matrix, list(df.index.astype(str)), list(df.columns.astype(str))
-            return matrix
-
+        if isinstance(input_data, (str, Path)):
+            # If input is a file path
+            print("ciao")
+            mat, row_labels, col_labels = self._load_from_path(Path(input_data))
         elif isinstance(input_data, pd.DataFrame):
             # If input is already a DataFrame
-            matrix = sp.csr_matrix(input_data.values)
-            if return_labels:
-                return matrix, list(input_data.index.astype(str)), list(input_data.columns.astype(str))
-            return matrix
-
+            mat, row_labels, col_labels = self._load_from_dataframe(input_data)
         else:
             # For other types (numpy arrays, edge lists, etc.)
-            matrix = self._convert_to_sparse(input_data)
+            mat = self._load_from_other(input_data)
             if return_labels:
                 raise ValueError("Cannot extract labels from this data type.")
-            return matrix
+            return mat
+
+        if return_labels:
+            return mat.tocsr(), row_labels, col_labels
+        else:
+            return mat.tocsr()
 
     def add_matrix(
         self,
@@ -100,7 +98,7 @@ class RawMatrixProcessor:
           - col_labels: list[str]
               list of column label strings
         """
-        matrix = self.load_to_sparse(input_data)
+        matrix = self.load_as_sparse(input_data)
         self._update_union(self.global_row_labels, row_labels)
         self._update_union(self.global_col_labels, col_labels)
         self.matrices.append((matrix, row_labels, col_labels))
@@ -154,44 +152,56 @@ class RawMatrixProcessor:
     # -----------------------------
     # Internal Methods
     # ----------------------------
+    def _load_from_path(self, path: Path):
+        ext = path.suffix.lower()
+        stem = path.stem    # name without extension
+        row_labels = col_labels = None
 
-    def _update_union(self, overall: List[str], new_labels: List[str]) -> None:
-        # Add new labels to the global list if they are not already present
-        for label in new_labels:
-            if label not in overall:
-                overall.append(label)
+        if ext in ['.csv', '.tsv']:
+            sep = ',' if ext == '.csv' else '\t'
+            df = pd.read_csv(path, sep=sep)
+            mat, row_labels, col_labels = self._load_from_dataframe(df)
 
+        elif ext in ['.xlsx', '.xls']:
+            df = pd.read_excel(path)
+            mat, row_labels, col_labels = self._load_from_dataframe(df)
 
-    def _read_file(self, filepath: str) -> pd.DataFrame:
-        """
-        Reads a file into a pandas DataFrame.
-        Supports CSV and TSV formats.
+        elif ext in ['.mtx', '.mm']:
+            from scipy.io import mmread
+            mat = mmread(str(path))
+        elif ext in ['.npy', '.npz']:
+            arr = np.load(path)
+            if sp.issparse(arr):
+                mat = arr
+            else:
+                mat = sp.csr_matrix(arr)
+        else:
+            raise ValueError(f"Format file not recognized: {ext}")
+        
+        return mat, row_labels, col_labels
+    
+    def _load_from_dataframe(self, df: pd.DataFrame):
+        # If index/columns labels are present, store them
+        if not df.index.equals(pd.RangeIndex(start=0, stop=len(df))):
+            row_labels = df.index.tolist()
+        else:
+            row_labels = None
 
-        Parameters
-        ----------
-          - filepath: str
-              path to the input file
+        if not df.columns.equals(pd.RangeIndex(start=0, stop=len(df.columns))):
+            col_labels = df.columns.tolist()
+        else:
+            col_labels = None
 
-        Returns
-        -------
-          - pd.DataFrame:
-              DataFrame with the file contents
-        """
-        _, ext = os.path.splitext(filepath.lower())
-        sep = '\t' if ext in ['.tsv'] else ','  # Use tab for .tsv, comma for others
-
-        try:
-            return pd.read_csv(filepath, sep=sep, index_col=0)
-        except Exception as e:
-            raise ValueError(f"Failed to read file {filepath}: {e}")
-
-    def _convert_to_sparse(self, data: Any) -> csr_matrix:
+        mat = sp.csr_matrix(df.values)
+        return mat, row_labels, col_labels
+         
+    def _load_from_other(self, obj):
         """
         Converts various types of input data to a sparse CSR matrix.
 
         Parameters
         ----------
-          - data: various types
+          - obj: various types
               Can be:
                 - scipy sparse matrix
                 - numpy array
@@ -203,21 +213,21 @@ class RawMatrixProcessor:
           - scipy.sparse.csr_matrix:
               The converted sparse CSR matrix
         """
-        if sp.issparse(data):
-            return data.tocsr()
-        elif isinstance(data, np.ndarray):
-            return sp.csr_matrix(data)
-        elif isinstance(data, list):
-            # Case 1: dense matrix format [[1, 2], [3, 4]]
-            if all(isinstance(row, list) for row in data):
-                return sp.csr_matrix(np.array(data))
-            # Case 2: edge list format [(i, j), ...] or [(i, j, value), ...]
-            elif all(isinstance(item, (tuple, list)) for item in data):
+        if isinstance(obj, (np.ndarray, np.matrix)):
+            return sp.csr_matrix(obj)
+        elif sp.issparse(obj):
+            return obj.tocsr()
+        elif isinstance(obj, list):
+            # Check if it's a dense matrix or an edge list
+            if all(isinstance(row, (list, np.ndarray)) for row in obj):
+                return sp.csr_matrix(np.array(obj))
+            elif all(isinstance(item, (tuple, list)) for item in obj):
+                # Edge list: [(i, j), ...] or [(i, j, weight), ...]
                 rows, cols, vals = [], [], []
-                for item in data:
+                for item in obj:
                     if len(item) == 2:
                         i, j = item
-                        v = 1  # default weight = 1
+                        v = 1        # default weight = 1
                     elif len(item) == 3:
                         i, j, v = item
                     else:
@@ -229,4 +239,10 @@ class RawMatrixProcessor:
                 n_cols = max(cols) + 1
                 return sp.csr_matrix((vals, (rows, cols)), shape=(n_rows, n_cols))
         else:
-            raise TypeError(f"Unsupported input type: {type(data)}")
+            raise TypeError(f"Unsupported input type: {type(obj)}")
+
+    def _update_union(self, overall: List[str], new_labels: List[str]) -> None:
+        # Add new labels to the global list if they are not already present
+        for label in new_labels:
+            if label not in overall:
+                overall.append(label)

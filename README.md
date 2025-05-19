@@ -59,8 +59,7 @@ pip install --upgrade -r requirements.txt
 # core install
 pip install -e .
 
-# dev tools (testing, linting, etc.)
-pip install -r requirements-dev.txt
+
 ```
 Then run the test suite:
 ```bash

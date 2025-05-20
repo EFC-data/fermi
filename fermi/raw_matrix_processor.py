@@ -152,7 +152,9 @@ class RawMatrixProcessor:
     # -----------------------------
     # Internal Methods
     # ----------------------------
-    def _load_from_path(self, path: Path):
+    def _load_from_path(self, path):
+        path = Path(path).resolve()
+
         ext = path.suffix.lower()
         stem = path.stem    # name without extension
         row_labels = col_labels = None

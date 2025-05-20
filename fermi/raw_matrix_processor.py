@@ -63,13 +63,15 @@ class RawMatrixProcessor:
         """
         if isinstance(input_data, (str, Path)):
             # If input is a file path
-            print("ciao")
+            print(f"Loading input file {input_data} (str or Path)")
             mat, row_labels, col_labels = self._load_from_path(Path(input_data))
         elif isinstance(input_data, pd.DataFrame):
             # If input is already a DataFrame
+            print(f"Loading input file {input_data} (pd.Dataframe)")
             mat, row_labels, col_labels = self._load_from_dataframe(input_data)
         else:
             # For other types (numpy arrays, edge lists, etc.)
+            print(f"Loading input file {input_data} (neither str nor Path nor pd.Dataframe but others)")
             mat = self._load_from_other(input_data)
             if return_labels:
                 raise ValueError("Cannot extract labels from this data type.")

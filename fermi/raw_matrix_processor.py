@@ -43,7 +43,8 @@ class RawMatrixProcessor:
     def load_as_sparse(
         self,
         input_data: Union[str, Path, pd.DataFrame, np.ndarray, List[Any]],
-        return_labels: bool = False
+        return_labels: bool = False,
+        **kwargs
         ) -> Union[csr_matrix, Tuple[csr_matrix, List[str], List[str]]]:
         
         """
@@ -64,15 +65,15 @@ class RawMatrixProcessor:
         if isinstance(input_data, (str, Path)):
             # If input is a file path
             print(f"Loading input file {input_data} (str or Path)")
-            mat, row_labels, col_labels = self._load_from_path(Path(input_data))
+            mat, row_labels, col_labels = self._load_from_path(Path(input_data), **kwargs)
         elif isinstance(input_data, pd.DataFrame):
             # If input is already a DataFrame
             print(f"Loading input file {input_data} (pd.Dataframe)")
-            mat, row_labels, col_labels = self._load_from_dataframe(input_data)
+            mat, row_labels, col_labels = self._load_from_dataframe(input_data, **kwargs)
         else:
             # For other types (numpy arrays, edge lists, etc.)
             print(f"Loading input file {input_data} (neither str nor Path nor pd.Dataframe but others)")
-            mat = self._load_from_other(input_data)
+            mat = self._load_from_other(input_data, **kwargs)
             if return_labels:
                 raise ValueError("Cannot extract labels from this data type.")
             return mat
@@ -86,7 +87,8 @@ class RawMatrixProcessor:
         self,
         input_data: Any,
         row_labels: List[str],
-        col_labels: List[str]
+        col_labels: List[str],
+        **kwargs
         ) -> None:
         """
         Add a matrix and its labels to the internal collection.
@@ -100,7 +102,7 @@ class RawMatrixProcessor:
           - col_labels: list[str]
               list of column label strings
         """
-        matrix = self.load_as_sparse(input_data)
+        matrix = self.load_as_sparse(input_data, **kwargs)
         self._update_union(self.global_row_labels, row_labels)
         self._update_union(self.global_col_labels, col_labels)
         self.matrices.append((matrix, row_labels, col_labels))
@@ -154,31 +156,35 @@ class RawMatrixProcessor:
     # -----------------------------
     # Internal Methods
     # ----------------------------
-    def _load_from_path(self, path):
+    def _load_from_path(self, path, **kwargs):
         path = Path(path).resolve()
 
         ext = path.suffix.lower()
-        stem = path.stem    # name without extension
+        stem = path.stem    # name without extension, not necessary for the moment
         row_labels = col_labels = None
+        dict_ext = {'.csv':',', '.tsv':'\t', '.dat':' '}
 
-        if ext in ['.csv', '.tsv']:
-            sep = ',' if ext == '.csv' else '\t'
-            df = pd.read_csv(path, sep=sep)
+        if ext in ['.csv', '.tsv', '.dat', '.txt']:
+            if kwargs.get('sep', None) is None:
+                kwargs['sep'] = dict_ext.get(ext, ',')
+            df = pd.read_csv(path, **kwargs)
             mat, row_labels, col_labels = self._load_from_dataframe(df)
 
         elif ext in ['.xlsx', '.xls']:
-            df = pd.read_excel(path)
+            df = pd.read_excel(path, **kwargs)
             mat, row_labels, col_labels = self._load_from_dataframe(df)
 
         elif ext in ['.mtx', '.mm']:
             from scipy.io import mmread
-            mat = mmread(str(path))
+            mat = mmread(str(path), **kwargs)
+
         elif ext in ['.npy', '.npz']:
-            arr = np.load(path)
+            arr = np.load(path, **kwargs)
             if sp.issparse(arr):
                 mat = arr
             else:
-                mat = sp.csr_matrix(arr)
+                mat = sp.csr_matrix(arr, **kwargs)
+
         else:
             raise ValueError(f"Format file not recognized: {ext}")
         

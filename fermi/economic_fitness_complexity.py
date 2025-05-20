@@ -326,13 +326,13 @@ class efc:
 
         if verbose:
             print("Ppc shape:", Ppc.shape, "\n")
-            print(Ppc.toarray(),"\n")
+            print(pd.DataFrame(Ppc.toarray()),"\n")
             print("Pcp:", Pcp.shape, "\n")
-            print(Pcp.toarray(), "\n")
+            print(pd.DataFrame(Pcp.toarray()), "\n")
             print("Mcc shape:", Mcc.shape, "\n")
-            print(Mcc.toarray(),"\n")
+            print(pd.DataFrame(Mcc.toarray()),"\n")
             print("Mpp:", Mpp.shape, "\n")
-            print(Mpp.toarray(), "\n")
+            print(pd.DataFrame(Mpp.toarray()), "\n")
             
         # ECI: second eigenvector of Mcc
         try:

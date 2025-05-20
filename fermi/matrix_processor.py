@@ -17,8 +17,8 @@ class MatrixProcessorCA:
     """
     def __init__(self) -> None:
         # Storage for raw and processed matrices and their labels
-        self._original: List[Tuple[csr_matrix, List[str], List[str]]] = []
-        self._processed: List[csr_matrix] = []
+        self._original: Tuple[csr_matrix, List[str], List[str]] = None
+        self._processed: csr_matrix = None
         self.global_row_labels: List[str] = []
         self.global_col_labels: List[str] = []
 
@@ -36,15 +36,15 @@ class MatrixProcessorCA:
         mat, rows, cols = self._load_full(input_data, **kwargs)
         # update global labels
         if rows:
-            self._update_union(self.global_row_labels, rows)
+            self.global_row_labels =  rows
         if cols:
-            self._update_union(self.global_col_labels, cols)
+            self.global_col_labels =  cols
         # store original and initial processed
-        self._original.append((mat, rows or [], cols or []))
-        self._processed.append(mat.copy())
+        self._original = (mat, rows or [], cols or [])
+        self._processed = mat.copy()
         return self
 
-    def align_matrices(self) -> None:
+    def align_matrices(self, ) -> None: # deprecated
         """
         Align all processed matrices to shared global labels.
         """
@@ -61,6 +61,7 @@ class MatrixProcessorCA:
             shape = (len(self.global_row_labels), len(self.global_col_labels))
             aligned.append(sp.csr_matrix((d, (r, c)), shape=shape))
         self._processed = aligned
+        return self
 
     def copy(self):  # ok with sparse
         """
@@ -76,74 +77,66 @@ class MatrixProcessorCA:
         """
         Replace each processed matrix with its RCA version.
         """
-        updated = []
-        for mat in self._processed:
-            val = np.sqrt(mat.sum().sum())
-            s0 = np.divide(val, mat.sum(0), where=mat.sum(0) > 0)
-            s1 = np.divide(val, mat.sum(1), where=mat.sum(1) > 0)
-            rca = mat.multiply(s0).multiply(s1)
-            updated.append(rca.tocsr())
-        self._processed = updated
+        mat = self._processed
+        val = np.sqrt(mat.sum().sum())
+        s0 = np.divide(val, mat.sum(0), where=mat.sum(0) > 0)
+        s1 = np.divide(val, mat.sum(1), where=mat.sum(1) > 0)
+        rca = mat.multiply(s0).multiply(s1)
+        self._processed = rca.tocsr()
+        return self
 
     def compute_ica(self) -> None:
         """
         Replace each processed matrix with its ICA version.
         """
-        updated = []
-        for mat in self._processed:
-            # check rows or columns zeros
-            row_sums = np.array(mat.sum(axis=1)).ravel()
-            col_sums = np.array(mat.sum(axis=0)).ravel()
-            row_mask = row_sums != 0
-            col_mask = col_sums != 0
-            submat = mat[row_mask][:, col_mask].tocsr()
+        mat = self._processed
+        # check rows or columns zeros
+        row_sums = np.array(mat.sum(axis=1)).ravel()
+        col_sums = np.array(mat.sum(axis=0)).ravel()
+        row_mask = row_sums != 0
+        col_mask = col_sums != 0
+        submat = mat[row_mask][:, col_mask].tocsr()
 
-            # compute the ica
-            graph = BipartiteGraph()
-            graph.set_biadjacency_matrix(submat)
-            graph.solve_tool(linsearch=True, verbose=False, print_error=False, model='biwcm_c')
-            avg = graph.avg_mat
-            inv_avg = np.divide(np.ones_like(avg), avg, where=avg > 0)
-            inv_avg[inv_avg == np.inf] = 0
-            ica_sub = submat.multiply(sp.csr_matrix(inv_avg))
+        # compute the ica
+        graph = BipartiteGraph()
+        graph.set_biadjacency_matrix(submat)
+        graph.solve_tool(linsearch=True, verbose=False, print_error=False, model='biwcm_c')
+        avg = graph.avg_mat
+        inv_avg = np.divide(np.ones_like(avg), avg, where=avg > 0)
+        inv_avg[inv_avg == np.inf] = 0
+        ica_sub = submat.multiply(sp.csr_matrix(inv_avg))
 
-            # restore the original dimensions
-            coo = ica_sub.tocoo()
-            orig_rows = np.nonzero(row_mask)[0][coo.row]
-            orig_cols = np.nonzero(col_mask)[0][coo.col]
-            ica = csr_matrix((coo.data, (orig_rows, orig_cols)), shape=mat.shape)
+        # restore the original dimensions
+        coo = ica_sub.tocoo()
+        orig_rows = np.nonzero(row_mask)[0][coo.row]
+        orig_cols = np.nonzero(col_mask)[0][coo.col]
+        ica = csr_matrix((coo.data, (orig_rows, orig_cols)), shape=mat.shape)
 
-            # append
-            updated.append(ica)
-        self._processed = updated
+        # append
+        self._processed = ica
+        return self
 
     # -----------------------------
     # Binarization
     # -----------------------------
-    def binarize(self, threshold: float) -> None:
+    def binarize(self, threshold: float = 1) -> None:
         """
         Binarize each processed matrix in-place with given threshold.
         """
-        result = []
-        for mat in self._processed:
-            if issparse(mat):
-                m = mat.tocsr()
-                m.data = np.where(m.data >= threshold, 1, 0)
-                result.append(m)
-            else:
-                arr = np.where(mat >= threshold, 1, 0)
-                result.append(csr_matrix(arr))
+        mat = self._processed
+        result = mat.tocsr()
+        result.data = np.where(result.data >= threshold, 1, 0)
+        result.eliminate_zeros()
         self._processed = result
+        return self
 
     # -----------------------------
     # Accessor
     # -----------------------------
-    def get_matrices(self, pos=None) -> List[csr_matrix]:
+    def get_matrix(self) -> csr_matrix:
         """
         Return the list of current processed matrices.
         """
-        if pos is not None:
-            return self._processed[pos]
         return self._processed
 
     # -----------------------------
@@ -206,7 +199,3 @@ class MatrixProcessorCA:
             return sp.csr_matrix((vals,(rows,cols)), shape=shape)
         raise TypeError(f"Unsupported input type: {type(obj)}")
 
-    def _update_union(self, overall: List[Any], new: List[Any]) -> None:
-        for item in new:
-            if item not in overall:
-                overall.append(item)

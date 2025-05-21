@@ -32,9 +32,9 @@ class efc(MatrixProcessorCA):
               Binary country-product matrix (sparse format).
           - hardcopy : bool, default True
               If True, matrix is copied to avoid side effects.
-          - label_rows : list, optional
+          - global_row_labels : list, optional
               List of row labels (e.g. country names).
-          - label_columns : list, optional
+          - global_col_labels : list, optional
               List of column labels (e.g. product codes).
 
         """
@@ -67,6 +67,12 @@ class efc(MatrixProcessorCA):
     ):
         super().load(input_data, **kwargs)
 
+        self.shape = self._processed.shape
+        if len(self.global_row_labels) == 0:
+            self.global_row_labels = list(range(self.shape[0]))
+        if len(self.global_col_labels) == 0:
+            self.global_col_labels = list(range(self.shape[1]))
+
         self.fitness = None
         self.complexity = None
         self.ubiquity = None
@@ -77,7 +83,6 @@ class efc(MatrixProcessorCA):
         self.pci_eig = None
         self.density = None
         self.nodf = None
-        self.shape = self._processed.shape
 
         return self
 
@@ -569,7 +574,7 @@ class efc(MatrixProcessorCA):
             elif check_stop == 'distance':
                 distance = np.abs(fit[newpos] - fit[colpos]).sum()
                 if verbose:
-                    print("iteration:", iterat, "L1 fitness:", distance)
+                    print("iteration:", iterat, "L1 convergence:", distance)
                 if iterat > max_iteration // 10:
                     if distance < min_distance:
                         break
@@ -611,12 +616,8 @@ class efc(MatrixProcessorCA):
             self.fitness, self.complexity = fit.to_numpy(), com.to_numpy()
 
         if aspandas:
-            if self.label_rows is None:
-                self.label_rows = list(range(self.shape[0]))
-            if self.label_columns is None:
-                self.label_columns = list(range(self.shape[1]))
-            fit_df = pd.DataFrame(self.fitness, index=self.label_rows, columns=["fitness"])
-            com_df = pd.DataFrame(self.complexity, index=self.label_columns, columns=["complexity"])
+            fit_df = pd.DataFrame(self.fitness, index=self.global_row_labels, columns=["fitness"])
+            com_df = pd.DataFrame(self.complexity, index=self.global_col_labels, columns=["complexity"])
             return fit_df, com_df
 
         return self.fitness, self.complexity
@@ -683,12 +684,8 @@ class efc(MatrixProcessorCA):
             self.eci, self.pci = self._eci_pci_indices(self._processed, **kwargs)
 
         if aspandas:
-            if self.label_rows is None:
-                self.label_rows = list(range(self.shape[0]))
-            if self.label_columns is None:
-                self.label_columns = list(range(self.shape[1]))
-            eci_df = pd.DataFrame(self.eci, index=self.label_rows, columns=["ECI"])
-            pci_df = pd.DataFrame(self.pci, index=self.label_columns, columns=["PCI"])
+            eci_df = pd.DataFrame(self.eci, index=self.global_row_labels, columns=["ECI"])
+            pci_df = pd.DataFrame(self.pci, index=self.global_col_labels, columns=["PCI"])
             return eci_df, pci_df
 
         return self.eci, self.pci
@@ -712,15 +709,11 @@ class efc(MatrixProcessorCA):
               ECI and PCI vectors as (np.ndarray, np.ndarray) or (pd.DataFrame, pd.DataFrame).
         """
         if self.diversification is None or self.ubiquity is None or force:
-            self.diversification, self.ubiquity = _compute_diversification_ubiquity._(self._processed, **kwargs)
+            self.diversification, self.ubiquity = self._compute_diversification_ubiquity(self._processed, **kwargs)
 
         if aspandas:
-            if self.label_rows is None:
-                self.label_rows = list(range(self.shape[0]))
-            if self.label_columns is None:
-                self.label_columns = list(range(self.shape[1]))
-            div = pd.DataFrame(self.diversification, index=self.label_rows, columns=["ECI"])
-            ubi = pd.DataFrame(self.ubiquity, index=self.label_columns, columns=["PCI"])
+            div = pd.DataFrame(self.diversification, index=self.global_row_labels, columns=["ECI"])
+            ubi = pd.DataFrame(self.ubiquity, index=self.global_col_labels, columns=["PCI"])
             return div, ubi
 
         return self.diversification, self.ubiquity
@@ -748,8 +741,8 @@ class efc(MatrixProcessorCA):
     def plot_matrix(self,
                     index: str = 'fitness',
                     cmap: str = 'Blues',
-                    label_rows: str = 'Countries',
-                    label_columns: str = 'Products',
+                    global_row_labels: str = 'Countries',
+                    global_col_labels: str = 'Products',
                     fontsize: int = 20,
                     user_set0: np.ndarray | None = None,
                     user_set1: np.ndarray | None = None,
@@ -768,9 +761,9 @@ class efc(MatrixProcessorCA):
               Sorting criterion: 'fitness', 'eci', 'degree', 'custom', 'no', etc.
           - cmap : str, default 'Blues'
               Colormap to use.
-          - label_rows : str, default 'Countries'
+          - global_row_labels : str, default 'Countries'
               Label for row axis.
-          - label_columns : str, default 'Products'
+          - global_col_labels : str, default 'Products'
               Label for column axis.
           - fontsize : int, default 20
               Font size for labels.
@@ -829,24 +822,24 @@ class efc(MatrixProcessorCA):
         fig, ax = plt.subplots(figsize=(18, 9))
         ax.matshow(matrix, aspect='auto', cmap=cmap, vmin=vmin, vmax=vmax)
         if index == 'eci':
-            ax.set_xlabel('{} (ordered by increasing PCI)'.format(label_columns), fontsize=fontsize, color='black',
+            ax.set_xlabel('{} (ordered by increasing PCI)'.format(global_col_labels), fontsize=fontsize, color='black',
                           loc='center')
-            ax.set_ylabel('{} (ordered by decreasing ECI)'.format(label_rows), fontsize=fontsize, color='black',
+            ax.set_ylabel('{} (ordered by decreasing ECI)'.format(global_row_labels), fontsize=fontsize, color='black',
                           loc='center')
         elif index == 'degree':
-            ax.set_xlabel('{} (ordered by increasing degree)'.format(label_columns), fontsize=fontsize, color='black',
+            ax.set_xlabel('{} (ordered by increasing degree)'.format(global_col_labels), fontsize=fontsize, color='black',
                           loc='center')
-            ax.set_ylabel('{} (ordered by decreasing degree)'.format(label_rows), fontsize=fontsize, color='black',
+            ax.set_ylabel('{} (ordered by decreasing degree)'.format(global_row_labels), fontsize=fontsize, color='black',
                           loc='center')
         elif index == 'custom':
-            ax.set_xlabel('{} (ordered by increasing rank)'.format(label_columns), fontsize=fontsize, color='black',
+            ax.set_xlabel('{} (ordered by increasing rank)'.format(global_col_labels), fontsize=fontsize, color='black',
                           loc='center')
-            ax.set_ylabel('{} (ordered by decreasing rank)'.format(label_rows), fontsize=fontsize, color='black',
+            ax.set_ylabel('{} (ordered by decreasing rank)'.format(global_row_labels), fontsize=fontsize, color='black',
                           loc='center')
         else:
-            ax.set_xlabel('{} (ordered by increasing Q)'.format(label_columns), fontsize=fontsize, color='black',
+            ax.set_xlabel('{} (ordered by increasing Q)'.format(global_col_labels), fontsize=fontsize, color='black',
                           loc='center')
-            ax.set_ylabel('{} (ordered by decreasing F)'.format(label_rows), fontsize=fontsize, color='black',
+            ax.set_ylabel('{} (ordered by decreasing F)'.format(global_row_labels), fontsize=fontsize, color='black',
                           loc='center')
 
         ax.xaxis.set_ticks_position('bottom')

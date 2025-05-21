@@ -1,6 +1,3 @@
-# Standard library
-import os
-
 # Third-party libraries
 import matplotlib.pyplot as plt
 import networkx as nx

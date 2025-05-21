@@ -44,7 +44,7 @@ class MatrixProcessorCA:
         self._processed = mat.copy()
         return self
 
-    def align_matrices(self, ) -> None: # deprecated
+    def align_matrices(self, ) -> "MatrixProcessorCA": # deprecated
         """
         Align all processed matrices to shared global labels.
         """
@@ -73,7 +73,7 @@ class MatrixProcessorCA:
     # -----------------------------
     # Comparative Advantage Methods
     # -----------------------------
-    def compute_rca(self) -> None:
+    def compute_rca(self) -> "MatrixProcessorCA":
         """
         Replace each processed matrix with its RCA version.
         """
@@ -85,7 +85,7 @@ class MatrixProcessorCA:
         self._processed = rca.tocsr()
         return self
 
-    def compute_ica(self) -> None:
+    def compute_ica(self) -> "MatrixProcessorCA":
         """
         Replace each processed matrix with its ICA version.
         """
@@ -119,7 +119,7 @@ class MatrixProcessorCA:
     # -----------------------------
     # Binarization
     # -----------------------------
-    def binarize(self, threshold: float = 1) -> None:
+    def binarize(self, threshold: float = 1) -> "MatrixProcessorCA":
         """
         Binarize each processed matrix in-place with given threshold.
         """

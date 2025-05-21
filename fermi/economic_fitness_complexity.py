@@ -803,13 +803,22 @@ class efc(MatrixProcessorCA):
                     max_iterations=max_iterations
                 )
             else:  # spectral
-                self.eci, self.eci_eig, self.pci, self.pci_eig = self._eci_pci_indices(
-                    self._processed,
-                    method=method,
-                    norm=norm,
-                    eigv=eigv,
-                    verbose=verbose
-                )
+                if eigv:
+                    self.eci, self.eci_eig, self.pci, self.pci_eig = self._eci_pci_indices(
+                        self._processed,
+                        method=method,
+                        norm=norm,
+                        eigv=eigv,
+                        verbose=verbose
+                    )
+                else:
+                    self.eci, self.pci = self._eci_pci_indices(
+                        self._processed,
+                        method=method,
+                        norm=norm,
+                        eigv=eigv,
+                        verbose=verbose
+                    )
 
         # Optionally wrap in pandas
         if aspandas:

@@ -4,7 +4,10 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 from tqdm import trange
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Any
+from pathlib import Path
+import pandas as pd
+
 
 # BICM library
 from bicm import BipartiteGraph
@@ -47,7 +50,16 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         if matrix is not None:
             self.load(matrix.copy())
+            
+    def load(
+            self,
+            input_data: Union[str, Path, pd.DataFrame, np.ndarray, List[Any]],
+            **kwargs
+    ):
+        super().load(input_data, **kwargs)
+        self._processed_dense = self._processed.toarray()
 
+    
 ########################################
 ########## INTERNAL METHODS ############
 ########################################
@@ -67,9 +79,9 @@ class RelatednessMetrics(MatrixProcessorCA):
               Cooccurrence matrix (square) of dimensions depending on the chosen layer.
         """
         if rows:
-            return self._processed.dot(self._processed.T)
+            return self._processed_dense.dot(self._processed_dense.T)
         else:
-            return self._processed.T.dot(self._processed)
+            return self._processed_dense.T.dot(self._processed_dense)
 
     def _proximity(self, rows: bool = True) -> np.ndarray:
         """
@@ -87,11 +99,11 @@ class RelatednessMetrics(MatrixProcessorCA):
               Proximity matrix where elements are cooccurrence weighted by inverse ubiquity.
         """
         if rows:
-            cooc = self._processed.dot(self._processed.T)
-            ubiquity = self._processed.sum(axis=1)
+            cooc = self._processed_dense.dot(self._processed_dense.T)
+            ubiquity = self._processed_dense.sum(axis=1)
         else:
-            cooc = self._processed.T.dot(self._processed)
-            ubiquity = self._processed.sum(axis=0)
+            cooc = self._processed_dense.T.dot(self._processed_dense)
+            ubiquity = self._processed_dense.sum(axis=0)
 
         ubi_mat = np.tile(ubiquity, (len(ubiquity), 1))
         ubi_max = np.maximum(ubi_mat, ubi_mat.T).astype(float)
@@ -113,7 +125,7 @@ class RelatednessMetrics(MatrixProcessorCA):
           - np.ndarray
               Taxonomy matrix reflecting normalized transitions between nodes.
         """
-        network = self._processed.T if rows else self._processed
+        network = self._processed_dense.T if rows else self._processed_dense
         diversification = network.sum(axis=1)
         div_mat = np.tile(diversification, (network.shape[1], 1)).T
         m_div = np.divide(network, div_mat, where=div_mat != 0)
@@ -142,7 +154,7 @@ class RelatednessMetrics(MatrixProcessorCA):
           - np.ndarray
               Assist matrix quantifying relationships between corresponding nodes.
         """
-        matrix_0 = self._processed.T if rows else self._processed
+        matrix_0 = self._processed_dense.T if rows else self._processed_dense
         second_matrix = second_matrix.T if rows else second_matrix
 
         diversification = second_matrix.sum(axis=1)
@@ -438,11 +450,11 @@ class RelatednessMetrics(MatrixProcessorCA):
         """
         Generate BICM samples and validate the network.
         """
-        original_bipartite = self._processed
+        original_bipartite = self._processed_dense
         empirical_projection = self.get_projection(second_matrix=other_network, rows=rows, method=method)
 
         myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self._processed)
+        myGraph.set_biadjacency_matrix(self._processed_dense)
         my_probability_matrix = myGraph.get_bicm_matrix()
         pvalues_matrix = np.zeros_like(empirical_projection)
 
@@ -453,16 +465,16 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         for _ in trange(num_iterations):
             if method=="assist":
-                self._processed = sample_bicm(my_probability_matrix)
+                self._processed_dense = sample_bicm(my_probability_matrix)
                 second_sample = sample_bicm(other_probability_matrix)
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method)>=empirical_projection, 1,0))
 
             else:
-                self._processed = sample_bicm(my_probability_matrix)
+                self._processed_dense = sample_bicm(my_probability_matrix)
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=other_network, rows=rows, method=method)>=empirical_projection, 1,0))
 
         pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
-        self._processed = original_bipartite #reset class network
+        self._processed_dense = original_bipartite #reset class network
         if method=="assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)

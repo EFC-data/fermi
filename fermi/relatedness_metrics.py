@@ -1,6 +1,3 @@
-# Standard library
-import os
-
 # Third-party libraries
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -28,13 +25,14 @@ from bokeh.palettes import Spectral4
 # NetworkX algorithms
 from networkx.algorithms import bipartite
 
+from .matrix_processor import MatrixProcessorCA
 
-class RelatednessMetrics:
+class RelatednessMetrics(MatrixProcessorCA):
     """
     A class representing a bipartite network with statistical validation
     and relatedness computation.
     """
-    def __init__(self, matrix: Union[np.ndarray, sp.spmatrix], hardcopy: bool = False):
+    def __init__(self, matrix: Union[np.ndarray, sp.spmatrix] = None):
         """
         Initialize the bipartite network with a given binary matrix.
 
@@ -45,13 +43,10 @@ class RelatednessMetrics:
           - hardcopy : bool, optional
               Whether to create a copy of the input matrix (default is False).
         """
-        if sp.issparse(matrix):
-            matrix = matrix.toarray()
-        if hardcopy:
-            self.network = matrix.copy()
-        else:
-            self.network = matrix
-        self.rows = True
+        super().__init__()
+
+        if matrix is not None:
+            self.load(matrix.copy())
 
 ########################################
 ########## INTERNAL METHODS ############
@@ -72,13 +67,14 @@ class RelatednessMetrics:
               Cooccurrence matrix (square) of dimensions depending on the chosen layer.
         """
         if rows:
-            return self.network.dot(self.network.T)
+            return self._processed.dot(self._processed.T)
         else:
-            return self.network.T.dot(self.network)
+            return self._processed.T.dot(self._processed)
 
     def _proximity(self, rows: bool = True) -> np.ndarray:
         """
         Compute the proximity network from a bipartite network.
+        Introduced by Hidalgo et al. (2007)
 
         Parameters
         ----------
@@ -91,11 +87,11 @@ class RelatednessMetrics:
               Proximity matrix where elements are cooccurrence weighted by inverse ubiquity.
         """
         if rows:
-            cooc = self.network.dot(self.network.T)
-            ubiquity = self.network.sum(axis=1)
+            cooc = self._processed.dot(self._processed.T)
+            ubiquity = self._processed.sum(axis=1)
         else:
-            cooc = self.network.T.dot(self.network)
-            ubiquity = self.network.sum(axis=0)
+            cooc = self._processed.T.dot(self._processed)
+            ubiquity = self._processed.sum(axis=0)
 
         ubi_mat = np.tile(ubiquity, (len(ubiquity), 1))
         ubi_max = np.maximum(ubi_mat, ubi_mat.T).astype(float)
@@ -105,6 +101,7 @@ class RelatednessMetrics:
     def _taxonomy(self, rows: bool = True) -> np.ndarray:
         """
         Compute the taxonomy network from a bipartite network.
+        Introduced by Zaccaria et al. (2014)
 
         Parameters
         ----------
@@ -116,7 +113,7 @@ class RelatednessMetrics:
           - np.ndarray
               Taxonomy matrix reflecting normalized transitions between nodes.
         """
-        network = self.network.T if rows else self.network
+        network = self._processed.T if rows else self._processed
         diversification = network.sum(axis=1)
         div_mat = np.tile(diversification, (network.shape[1], 1)).T
         m_div = np.divide(network, div_mat, where=div_mat != 0)
@@ -131,6 +128,7 @@ class RelatednessMetrics:
     def _assist(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
         """
         Compute assist matrix between the stored network and a second binary matrix.
+        Introduced by Pugliese et al. (2019)
 
         Parameters
         ----------
@@ -144,7 +142,7 @@ class RelatednessMetrics:
           - np.ndarray
               Assist matrix quantifying relationships between corresponding nodes.
         """
-        matrix_0 = self.network.T if rows else self.network
+        matrix_0 = self._processed.T if rows else self._processed
         second_matrix = second_matrix.T if rows else second_matrix
 
         diversification = second_matrix.sum(axis=1)
@@ -411,6 +409,7 @@ class RelatednessMetrics:
         Parameters:
             second_matrix: Second binary matrix if method == "assist"
             rows: boolean, if True processes rows, if False processes columns
+            methods: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
 
         Returns:
             numpy.ndarray: The projection matrix representing relationships between matrices
@@ -439,11 +438,11 @@ class RelatednessMetrics:
         """
         Generate BICM samples and validate the network.
         """
-        original_bipartite = self.network
+        original_bipartite = self._processed
         empirical_projection = self.get_projection(second_matrix=other_network, rows=rows, method=method)
 
         myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self.network)
+        myGraph.set_biadjacency_matrix(self._processed)
         my_probability_matrix = myGraph.get_bicm_matrix()
         pvalues_matrix = np.zeros_like(empirical_projection)
 
@@ -454,16 +453,16 @@ class RelatednessMetrics:
 
         for _ in trange(num_iterations):
             if method=="assist":
-                self.network = sample_bicm(my_probability_matrix)
+                self._processed = sample_bicm(my_probability_matrix)
                 second_sample = sample_bicm(other_probability_matrix)
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method)>=empirical_projection, 1,0))
 
             else:
-                self.network = sample_bicm(my_probability_matrix)
+                self._processed = sample_bicm(my_probability_matrix)
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=other_network, rows=rows, method=method)>=empirical_projection, 1,0))
 
         pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
-        self.network = original_bipartite #reset class network
+        self._processed = original_bipartite #reset class network
         if method=="assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)

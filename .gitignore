@@ -50,3 +50,7 @@ Thumbs.db
 coverage.xml
 htmlcov/
 .tox/
+/matrix_original.csv
+/matrix_original.dat
+/matrix_original.mtx
+/matrix_original.npz

@@ -62,7 +62,6 @@ class efc(MatrixProcessorCA):
     def load(
             self,
             input_data: Union[str, Path, pd.DataFrame, np.ndarray, List[Any]],
-            align: bool = True,  # new flag only for subclass
             **kwargs
     ):
         super().load(input_data, **kwargs)
@@ -583,6 +582,97 @@ class efc(MatrixProcessorCA):
             return fit[newpos] * dim[0], com[newpos] * dim[1]
 
         return fit[newpos], com[newpos]
+    
+    def _NODF(self) -> float:
+        """
+        Compute the metric Nestedness Overlap and Decreasing Fill (NODF) of a binary matrix.
+
+        Returns
+        -------
+          - NODF: float
+              Scalar NODF value.
+        """
+        if issparse(self._processed):
+            A = self._processed.toarray()
+        N,M = A.shape
+        
+        # Row degrees k_i and row‐overlaps O_{ij}
+        overlap_rows = A.dot(A.T)
+        k_rows  = A.sum(axis=1)
+        
+        # Col degrees k_α and row‐overlaps O_{αβ}
+        overlap_cols = A.T.dot(A)
+        k_cols  = A.sum(axis=0)  
+
+        # N^R = sum_{i,j : k_i > k_j > 0} (O_ij / k_j)
+        i_r = k_rows.reshape(-1, 1)  # shape (N,1)
+        j_r = k_rows.reshape(1, -1)  # shape (1,N)
+
+        mask_r = (i_r > j_r) & (j_r > 0)       # only pairs with strictly larger degree
+        N_R = np.sum(overlap_rows[mask_r] / j_r[mask_r])
+
+        # N^C = sum_{α,β : k_α > k_β > 0} (O_αβ / k_β)
+        i_c = k_cols.reshape(-1, 1)  # shape (M,1)
+        j_c = k_cols.reshape(1, -1)  # shape (1,M) 
+
+        mask_c = (i_c > j_c) & (j_c > 0)       # only pairs with strictly larger degree
+        N_C = np.sum(overlap_cols[mask_c] / j_c[mask_c])
+
+        denom_R = N * (N - 1) / 2
+        denom_C = M * (M - 1) / 2
+
+        NODF = (N_R / denom_R + N_C / denom_C) / 2.
+
+        return NODF
+    
+    def _S_NODF(self) -> float:
+        """
+        Compute the metric Stable NODF (S-NODF) of a binary matrix.
+
+        Returns
+        -------
+          - S_NODF: float
+              Scalar S-NODF value.
+        """
+
+        if issparse(self._processed):
+            A = self._processed.toarray()
+                
+        # Row degrees k_i and row‐overlaps O_{ij}
+        k_r = A.sum(axis=1)                 
+        O_r = A.dot(A.T) 
+        N = A.shape[0]              
+
+        # Col degrees k_α and row‐overlaps O_{αβ}
+        k_c = A.sum(axis=0)
+        O_c = A.T.dot(A)     
+        M = A.shape[1]
+
+        # Mask to avoid double counting: only i<j terms 
+        triu_r = np.triu_indices(N, k=1)  # k = 1 not consider diagonal
+        triu_c = np.triu_indices(M, k=1)  # k = 1 not consider diagonal
+
+        # Matrix of minima for rows
+        i_r = k_r.reshape(-1, 1)
+        j_r = k_r.reshape(1, -1)
+        min_r = np.minimum(i_r, j_r) 
+        valid_r = min_r[triu_r] > 0
+
+        # Matrix of minima for cols
+        i_c = k_c.reshape(-1, 1)
+        j_c = k_c.reshape(1, -1)
+        min_c = np.minimum(i_c, j_c)
+        valid_c = min_c[triu_c] > 0     
+
+        eta_R = np.sum(O_r[triu_r][valid_r] / min_r[triu_r][valid_r])        
+        eta_C = np.sum(O_c[triu_c][valid_c] / min_c[triu_c][valid_c])
+
+        denom_R = N * (N - 1) / 2   
+        denom_C = M * (M - 1) / 2
+
+        S_NODF = (eta_R + eta_C) / (denom_R + denom_C)
+
+        return S_NODF   
 
     ############################
     ########  Wrappers  ########
@@ -780,6 +870,26 @@ class efc(MatrixProcessorCA):
         if self.density is None:
             self.density = self._processed.nnz / (self.shape[0] * self.shape[1])
         return self.density
+    
+    def get_nodf(self, force: bool = False) -> float:
+        """
+        Computes the Nestedness metric (NODF) of the binary matrix.
+
+        NODF is a measure of how nested the matrix is, indicating how well
+        the presence of certain elements in rows and columns correlates.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+          - float
+              Scalar NODF value.
+        """
+        if self.nodf is None or force:
+            self.nodf = _nodf(self._processed)
+        return self.nodf
 
     def plot_matrix(self,
                     index: str = 'fitness',

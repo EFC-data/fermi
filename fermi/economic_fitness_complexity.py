@@ -629,7 +629,7 @@ class efc(MatrixProcessorCA):
             norm: str = 'sum',
             s_labels: list | None = None,
             aspandas: bool = False
-    ) -> np.ndarray | pd.Series:
+            ) -> np.ndarray | pd.Series:
         """
         Compute exogenous fitness of subnational units using externally provided product complexities.
 
@@ -662,37 +662,80 @@ class efc(MatrixProcessorCA):
             return pd.DataFrame(F_exog.ravel(), index=labels, columns=['exogenous fitness'])
         return F_exog
 
-    def get_eci_pci(self, force: bool = False, aspandas: bool = False, **kwargs) -> tuple:
+    def get_eci_pci(
+        self,
+        method: str = 'reflections',
+        norm: str = 'zscore',
+        max_iterations: int = 18,
+        eigv: bool = False,
+        verbose: bool = False,
+        force: bool = False,
+        aspandas: bool = False
+    ) -> Union[
+        tuple[np.ndarray, np.ndarray],
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+    ]:
         """
-        Compute and optionally return ECI and PCI vectors.
+        Compute ECI and PCI (and optionally their eigenvectors).
 
         Parameters
         ----------
-          - force : bool, default False
-              If True, forces recomputation even if already cached.
-          - aspandas : bool, default False
-              If True, returns results as pandas DataFrames.
-          - **kwargs : dict
-              Additional parameters forwarded to _eci_pci_indices().
+          - method : {'reflections', 'spectral'}
+              Choice of algorithm.
+          - norm : str
+              How to normalize the output vectors.
+          - max_iterations : int
+              Only for 'reflections'.
+          - eigv : bool
+              Only for 'spectral': if True, also return eigenvectors.
+          - verbose : bool
+              Only for 'spectral': print debug info.
+          - force : bool
+              If True, recompute even if cached.
+          - aspandas : bool
+              If True, return pandas DataFrames instead of numpy arrays.
 
         Returns
         -------
-          - tuple
-              ECI and PCI vectors as (np.ndarray, np.ndarray) or (pd.DataFrame, pd.DataFrame).
+          - tuple: (eci, pci)
+              Two arrays if eigv=False.
+          - tuple: (eci, eci_eig, pci, pci_eig)
+              Four arrays if eigv=True and method='spectral'.
         """
+        # Recompute if needed
         if self.eci is None or self.pci is None or force:
-            self.eci, self.pci = self._eci_pci_indices(self._processed, **kwargs)
+            if method == 'reflections':
+                # pass only the args relevant to reflections
+                self.eci, self.pci = self._eci_pci_indices(
+                    self._processed,
+                    method=method,
+                    norm=norm,
+                    max_iterations=max_iterations
+                )
+            else:  # spectral
+                self.eci, self.eci_eig, self.pci, self.pci_eig = self._eci_pci_indices(
+                    self._processed,
+                    method=method,
+                    norm=norm,
+                    eigv=eigv,
+                    verbose=verbose
+                )
 
+        # Optionally wrap in pandas
         if aspandas:
             eci_df = pd.DataFrame(self.eci, index=self.global_row_labels, columns=["ECI"])
             pci_df = pd.DataFrame(self.pci, index=self.global_col_labels, columns=["PCI"])
             return eci_df, pci_df
 
-        return self.eci, self.pci
+        # Return numpy arrays (2 or 4)
+        if method == 'spectral' and eigv:
+            return self.eci, self.eci_eig, self.pci, self.pci_eig
+        else:
+            return self.eci, self.pci
 
     def get_diversification_ubiquity(self, force: bool = False, aspandas: bool = False, **kwargs) -> tuple:
         """
-        Compute and optionally return ECI and PCI vectors.
+        Compute and optionally return diversification and ubiquity vectors.
 
         Parameters
         ----------
@@ -706,14 +749,14 @@ class efc(MatrixProcessorCA):
         Returns
         -------
           - tuple
-              ECI and PCI vectors as (np.ndarray, np.ndarray) or (pd.DataFrame, pd.DataFrame).
+              diversification and ubiquity vectors as (np.ndarray, np.ndarray) or (pd.DataFrame, pd.DataFrame).
         """
         if self.diversification is None or self.ubiquity is None or force:
             self.diversification, self.ubiquity = self._compute_diversification_ubiquity(self._processed, **kwargs)
 
         if aspandas:
-            div = pd.DataFrame(self.diversification, index=self.global_row_labels, columns=["ECI"])
-            ubi = pd.DataFrame(self.ubiquity, index=self.global_col_labels, columns=["PCI"])
+            div = pd.DataFrame(self.diversification, index=self.global_row_labels, columns=["diversification"])
+            ubi = pd.DataFrame(self.ubiquity, index=self.global_col_labels, columns=["ubiquity"])
             return div, ubi
 
         return self.diversification, self.ubiquity

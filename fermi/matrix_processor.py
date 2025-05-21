@@ -29,7 +29,7 @@ class MatrixProcessorCA:
         self,
         input_data: Union[str, Path, pd.DataFrame, np.ndarray, List[Any]],
         **kwargs
-    ):
+        ) -> "MatrixProcessorCA":
         """
         Load input_data as sparse matrix, store original and initialize processed as a copy.
         """
@@ -42,25 +42,6 @@ class MatrixProcessorCA:
         # store original and initial processed
         self._original = (mat, rows or [], cols or [])
         self._processed = mat.copy()
-        return self
-
-    def align_matrices(self, ) -> "MatrixProcessorCA": # deprecated
-        """
-        Align all processed matrices to shared global labels.
-        """
-        row_index = {lab: i for i, lab in enumerate(self.global_row_labels)}
-        col_index = {lab: i for i, lab in enumerate(self.global_col_labels)}
-        aligned = []
-        for mat, rows, cols in self._original:
-            coo = mat.tocoo()
-            r, c, d = [], [], []
-            for i, j, v in zip(coo.row, coo.col, coo.data):
-                r.append(row_index[rows[i]])
-                c.append(col_index[cols[j]])
-                d.append(v)
-            shape = (len(self.global_row_labels), len(self.global_col_labels))
-            aligned.append(sp.csr_matrix((d, (r, c)), shape=shape))
-        self._processed = aligned
         return self
 
     def copy(self):  # ok with sparse

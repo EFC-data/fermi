@@ -446,12 +446,12 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
 
-    def get_bicm_projection(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, other_network=None, validation_method=None):
+    def get_bicm_projection(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
         """
         Generate BICM samples and validate the network.
         """
         original_bipartite = self._processed_dense
-        empirical_projection = self.get_projection(second_matrix=other_network, rows=rows, method=method)
+        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
 
         myGraph = BipartiteGraph()
         myGraph.set_biadjacency_matrix(self._processed_dense)
@@ -460,7 +460,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         if method=="assist":
             second_network = BipartiteGraph()
-            second_network.set_biadjacency_matrix(other_network)
+            second_network.set_biadjacency_matrix(second_matrix)
             other_probability_matrix = second_network.get_bicm_matrix()
 
         for _ in trange(num_iterations):
@@ -471,7 +471,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 
             else:
                 self._processed_dense = sample_bicm(my_probability_matrix)
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=other_network, rows=rows, method=method)>=empirical_projection, 1,0))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_matrix, rows=rows, method=method)>=empirical_projection, 1,0))
 
         pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
         self._processed_dense = original_bipartite #reset class network

@@ -12,8 +12,7 @@ The **F**itn**E**ss, The **R**elatedness and The other **M**etr**I**cs
 FERMI is a modular Python framework for analyzing economic complexity using matrix-based techniques.
 It provides tools to explore the hidden structure of economies through:
 
-- 🧹 **Matrix preprocessing**: raw cleaning, validation, sparse conversion
-- 📊 **Comparative advantage**: RCA/ICA transformation and thresholding
+- 📊 **Matrix preprocessing**: raw cleaning, sparse conversion, Comparative advantage RCA/ICA, transformation and thresholding
 - 🧠 **Fitness & complexity**: compute Fitness, Complexity ECI, PCI and other metrics via multiple methods
 - 🌐 **Relatedness metrics**: product space, taxonomy, assist matrix
 - 📈 **Prediction models**: GDP forecasting, density models, XGBoost

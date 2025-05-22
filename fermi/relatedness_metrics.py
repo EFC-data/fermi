@@ -4,10 +4,10 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 from tqdm import trange
-from typing import Union, List, Tuple, Any
+from typing import Union, List, Tuple, Any, Optional
 from pathlib import Path
 import pandas as pd
-
+from scipy.sparse import csr_matrix
 
 # BICM library
 from bicm import BipartiteGraph
@@ -64,7 +64,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 ########## INTERNAL METHODS ############
 ########################################
 
-    def _cooccurrence(self, rows: bool = True) -> np.ndarray:
+    def _cooccurrence_dense(self, rows: bool = True) -> np.ndarray:
         """
         Compute the cooccurrence matrix for one layer of the bipartite network.
 
@@ -83,7 +83,26 @@ class RelatednessMetrics(MatrixProcessorCA):
         else:
             return self._processed_dense.T.dot(self._processed_dense)
 
-    def _proximity(self, rows: bool = True) -> np.ndarray:
+    def _cooccurrence(self, rows: bool = True) -> csr_matrix:
+        """
+        Compute the cooccurrence matrix for one layer of the bipartite network.
+
+        Parameters
+        ----------
+        - rows : bool, optional
+            If True, compute cooccurrence on the row-layer; if False, on the column-layer.
+
+        Returns
+        -------
+        - csr_matrix
+            Cooccurrence matrix (square, sparse) of dimensions depending on the chosen layer.
+        """
+        if rows:
+            return self._processed.dot(self._processed.T)
+        else:
+            return self._processed.T.dot(self._processed)
+
+    def _proximity_dense(self, rows: bool = True) -> np.ndarray:
         """
         Compute the proximity network from a bipartite network.
         Introduced by Hidalgo et al. (2007)
@@ -110,7 +129,44 @@ class RelatednessMetrics(MatrixProcessorCA):
         np.divide(np.ones_like(ubi_max, dtype=float), ubi_max, out=ubi_max, where=ubi_max != 0)
         return np.multiply(cooc, ubi_max)
 
-    def _taxonomy(self, rows: bool = True) -> np.ndarray:
+    def _proximity(self, rows: bool = True) -> csr_matrix:
+        """
+        Compute the proximity network from a bipartite network.
+        Introduced by Hidalgo et al. (2007)
+
+        Parameters
+        ----------
+        - rows : bool, optional
+            If True, compute proximity for row-layer; if False, for column-layer.
+
+        Returns
+        -------
+        - csr_matrix
+            Proximity matrix (sparse) where elements are cooccurrence weighted by inverse ubiquity.
+        """
+        if rows:
+            A = self._processed
+        else:
+            A = self._processed.T
+
+        cooc = A.dot(A.T).tocoo()
+        ubiquity = np.array(A.sum(axis=1)).flatten()
+
+        # Calcola inverso del massimo tra ubiquity[i] e ubiquity[j]
+        row = cooc.row
+        col = cooc.col
+        data = cooc.data
+
+        ubi_max = np.maximum(ubiquity[row], ubiquity[col])
+        with np.errstate(divide='ignore'):
+            weights = np.where(ubi_max != 0, 1.0 / ubi_max, 0.0)
+
+        proximity_data = data * weights
+        proximity = csr_matrix((proximity_data, (row, col)), shape=cooc.shape)
+
+        return proximity
+
+    def _taxonomy_dense(self, rows: bool = True) -> np.ndarray:
         """
         Compute the taxonomy network from a bipartite network.
         Introduced by Zaccaria et al. (2014)
@@ -137,7 +193,53 @@ class RelatednessMetrics(MatrixProcessorCA):
         np.divide(np.ones_like(ubi_max, dtype=float), ubi_max, out=ubi_max, where=ubi_max != 0)
         return np.multiply(intermediate, ubi_max)
 
-    def _assist(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
+    def _taxonomy(self, rows: bool = True) -> csr_matrix:
+        """
+        Compute the taxonomy network from a bipartite network.
+        Introduced by Zaccaria et al. (2014)
+
+        Parameters
+        ----------
+        - rows : bool, optional
+            If True, compute taxonomy based on row to column to row transitions; otherwise column.
+
+        Returns
+        -------
+        - csr_matrix
+            Taxonomy matrix reflecting normalized transitions between nodes.
+        """
+        if rows:
+            network = self._processed.T
+        else:
+            network = self._processed
+
+        diversification = np.array(network.sum(axis=1)).flatten()  # shape (n,)
+
+        # Normalizza ogni riga dividendo per la diversificazione corrispondente
+        # Evita divisioni per zero usando np.divide con 'where'
+        div_diag = csr_matrix((1.0 / diversification, (np.arange(len(diversification)), np.arange(len(diversification)))), shape=(len(diversification), len(diversification)))
+        div_diag.eliminate_zeros()
+
+        m_div = div_diag.dot(network)  # normalizza le righe di network
+
+        intermediate = network.T.dot(m_div).tocoo()
+
+        ubiquity = np.array(network.sum(axis=0)).flatten()
+
+        row = intermediate.row
+        col = intermediate.col
+        data = intermediate.data
+
+        ubi_max = np.maximum(ubiquity[row], ubiquity[col])
+        with np.errstate(divide='ignore'):
+            weights = np.where(ubi_max != 0, 1.0 / ubi_max, 0.0)
+
+        taxonomy_data = data * weights
+        taxonomy = csr_matrix((taxonomy_data, (row, col)), shape=intermediate.shape)
+
+        return taxonomy
+
+    def _assist_dense(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
         """
         Compute assist matrix between the stored network and a second binary matrix.
         Introduced by Pugliese et al. (2019)
@@ -170,7 +272,58 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return np.dot(matrix_0_norm.T, second_matrix_norm)
 
-    def _bonferroni_threshold(self, test_pvmat: np.ndarray, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
+    def _assist(self, second_matrix: csr_matrix, rows: bool = True) -> csr_matrix:
+        """
+        Compute assist matrix between the stored network and a second binary matrix.
+        Introduced by Pugliese et al. (2019)
+
+        Parameters
+        ----------
+        - second_matrix : csr_matrix
+            Second binary matrix to compare against the primary network.
+        - rows : bool, optional
+            If True, treat matrices with dimensions swapped for row-based processing.
+
+        Returns
+        -------
+        - csr_matrix
+            Assist matrix quantifying relationships between corresponding nodes.
+        """
+        if rows:
+            matrix_0 = self._processed.T
+            second_matrix = second_matrix.T
+        else:
+            matrix_0 = self._processed
+
+        diversification = np.array(second_matrix.sum(axis=1)).flatten()
+        mask = diversification > 0
+
+        # Filtra righe con diversificazione > 0
+        matrix_0_filtered = matrix_0[mask]
+        second_matrix_filtered = second_matrix[mask]
+        diversification_filtered = diversification[mask]
+
+        # Normalizza second_matrix_filtered riga per riga dividendo per diversification
+        div_diag = csr_matrix((1.0 / diversification_filtered, 
+                            (np.arange(len(diversification_filtered)), np.arange(len(diversification_filtered)))), 
+                            shape=(len(diversification_filtered), len(diversification_filtered)))
+        second_matrix_norm = div_diag.dot(second_matrix_filtered)
+
+        # Calcola ubiquity e corregge zeri
+        ubiquity = np.array(matrix_0_filtered.sum(axis=0)).flatten()
+        ubiquity[ubiquity == 0] = 1.0
+
+        div_diag_ubi = csr_matrix((1.0 / ubiquity, 
+                                (np.arange(len(ubiquity)), np.arange(len(ubiquity)))), 
+                                shape=(len(ubiquity), len(ubiquity)))
+        matrix_0_norm = matrix_0_filtered.dot(div_diag_ubi)
+
+        # Prodotto finale
+        assist = matrix_0_norm.T.dot(second_matrix_norm)
+
+        return assist
+
+    def _bonferroni_threshold_dense(self, test_pvmat: np.ndarray, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
         """
         Calculates the Bonferroni threshold for a bipartite matrix of p-values and returns
         the positions and p-values that satisfy the condition:
@@ -216,7 +369,51 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, threshold
 
-    def _fdr_threshold(self, test_pvmat, interval):
+    def _bonferroni_threshold(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
+        """
+        Calculates the Bonferroni threshold for a bipartite matrix of p-values and returns
+        the positions and p-values that satisfy the condition:
+
+        p_value < interval / D
+
+        where D is the total number of tested hypotheses (n * (n - 1) / 2 for symmetric case).
+
+        Parameters
+        ----------
+        - test_pvmat : csr_matrix
+            Square matrix of p-values (n x n).
+        - interval : float
+            Significance level alpha to be divided by the number of hypotheses.
+
+        Returns
+        -------
+        - positionvalidated : list of tuple
+            List of (i, j) indices where p-value < interval/D.
+        - pvvalidated : list of float
+            List of p-values satisfying the threshold.
+        - threshold : float
+            Computed threshold value (interval / D).
+        """
+        n = test_pvmat.shape[0]
+        D = n * (n - 1) / 2  # symmetric case (no diagonal, no duplicates)
+        threshold = interval / D
+
+        positionvalidated = []
+        pvvalidated = []
+
+        # Usando formato COO per iterare solo sugli elementi non zero
+        coo = test_pvmat.tocoo()
+        for i, j, v in zip(coo.row, coo.col, coo.data):
+            if i < j and v < threshold:
+                positionvalidated.append((i, j))
+                pvvalidated.append(v)
+
+        if not positionvalidated:
+            print("No value satisfies the condition.")
+
+        return positionvalidated, pvvalidated, threshold
+
+    def _fdr_threshold_dense(self, test_pvmat, interval):
         D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
         #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
         sorted_indices = []
@@ -261,18 +458,74 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, threshold
 
-    def _direct_threshold(self, test_pvmat, alpha):
+    def _fdr_threshold(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
         """
-        Seleziona le posizioni nella matrice dei p-value che soddisfano la soglia specificata da alpha.
+        Compute the FDR threshold for a bipartite matrix of p-values and return positions and values that satisfy the condition.
+
+        Parameters
+        ----------
+        - test_pvmat : csr_matrix
+            Square matrix of p-values.
+        - interval : float
+            Significance level alpha.
+
+        Returns
+        -------
+        - positionvalidated : list of tuple
+            List of (i, j) indices where p-values satisfy FDR threshold.
+        - pvvalidated : list of float
+            List of p-values passing the threshold.
+        - threshold : float or None
+            Computed threshold value or None if no values satisfy the condition.
+        """
+        n = test_pvmat.shape[0]
+        D = n * (n - 1) / 2  # symmetric case: no diagonal, no duplicates
+
+        # Estrai tutti i valori nella metà superiore
+        coo = test_pvmat.tocoo()
+        filtered = [(v, (i,j)) for i,j,v in zip(coo.row, coo.col, coo.data) if i < j]
+
+        if not filtered:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        sortedpvaluesfdr, sorted_indices = zip(*sorted(filtered, key=lambda x: x[0]))
+        sortedpvaluesfdr = np.array(sortedpvaluesfdr)
+
+        thresholds = (np.arange(1, len(sortedpvaluesfdr) + 1) * interval) / D
+        valid_indices = np.where(sortedpvaluesfdr <= thresholds)[0]
+
+        if len(valid_indices) == 0:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        thresholdpos = valid_indices[-1]
+        threshold = (thresholdpos + 1) * interval / D
+
+        positionvalidated = []
+        pvvalidated = []
+
+        for i, pval in enumerate(sortedpvaluesfdr):
+            if pval <= threshold:
+                positionvalidated.append(sorted_indices[i])
+                pvvalidated.append(pval)
+            else:
+                break
+
+        return positionvalidated, pvvalidated, threshold
+
+    def _direct_threshold_dense(self, test_pvmat, alpha):
+        """
+        Select the positions in the p-value matrix that meet the threshold specified by alpha.
 
         Args:
-            test_pvmat (np.ndarray): Matrice dei p-value.
-            alpha (float): Soglia fissa da applicare.
+            test_pvmat (np.ndarray): P-value matrix.
+            alpha (float): Fixed threshold to apply.
 
         Returns:
-            positionvalidated (list of tuple): Indici (i,j) dei p-value che soddisfano p <= alpha.
-            pvvalidated (list of float): P-value corrispondenti.
-            threshold (float): La soglia alpha usata.
+            positionvalidated (list of tuple): Indices (i,j) of the p-values that satisfy p <= alpha.
+            pvvalidated (list of float): Corresponding p-values.
+            threshold (float): The alpha threshold used.
         """
         sorted_indices = []
         sortedpvalues = []
@@ -300,9 +553,38 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, alpha
 
-    def _bonferroni_threshold_nonsymmetric(self, test_pvmat, interval):
+    def _direct_threshold(self, test_pvmat: csr_matrix, alpha: float) -> Tuple[List[Tuple[int, int]], List[float], Optional[float]]:
         """
-        Bonferroni su matrice non simmetrica (es. bipartita): p_ij < alpha / D con D = n * m.
+        Select the positions in the p-value matrix that meet the threshold specified by alpha.
+
+        Args:
+            test_pvmat (csr_matrix): P-value sparse matrix.
+            alpha (float): Fixed threshold to apply.
+
+        Returns:
+            positionvalidated (list of tuple): Indices (i,j) of p-values satisfying p <= alpha.
+            pvvalidated (list of float): Corresponding p-values.
+            threshold (float or None): The alpha threshold used or None if no values satisfy.
+        """
+        coo = test_pvmat.tocoo()
+        positionvalidated = []
+        pvvalidated = []
+
+        # Consider only upper triangular (i < j)
+        for i, j, v in zip(coo.row, coo.col, coo.data):
+            if i < j and v <= alpha:
+                positionvalidated.append((i, j))
+                pvvalidated.append(v)
+
+        if not pvvalidated:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        return positionvalidated, pvvalidated, alpha
+
+    def _bonferroni_threshold_nonsymmetric_dense(self, test_pvmat, interval):
+        """
+        Bonferroni for non symmetrical matrix (es. bipartite): p_ij < alpha / D con D = n * m.
         """
         D = test_pvmat.shape[0] * test_pvmat.shape[1]
         threshold = interval / D
@@ -321,9 +603,48 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, threshold
 
-    def _fdr_threshold_nonsymmetric(self, test_pvmat, interval):
+    def _bonferroni_threshold_nonsymmetric(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], float]:
         """
-        False Discovery Rate su matrice non simmetrica.
+        Bonferroni correction for non-symmetric matrix (e.g. bipartite): 
+        selects positions where p_ij < alpha / D with D = n * m.
+
+        Parameters
+        ----------
+        - test_pvmat : csr_matrix
+            Rectangular sparse matrix of p-values.
+        - interval : float
+            Significance level alpha.
+
+        Returns
+        -------
+        - positionvalidated : list of tuple
+            List of (i,j) indices where p-value < threshold.
+        - pvvalidated : list of float
+            Corresponding p-values.
+        - threshold : float
+            Computed threshold (interval / D).
+        """
+        n, m = test_pvmat.shape
+        D = n * m
+        threshold = interval / D
+
+        positionvalidated = []
+        pvvalidated = []
+
+        coo = test_pvmat.tocoo()
+        for i, j, v in zip(coo.row, coo.col, coo.data):
+            if v < threshold:
+                positionvalidated.append((i, j))
+                pvvalidated.append(v)
+
+        if not positionvalidated:
+            print("No value satisfies the condition.")
+
+        return positionvalidated, pvvalidated, threshold
+
+    def _fdr_threshold_nonsymmetric_dense(self, test_pvmat, interval):
+        """
+        False Discovery Rate for non symmetrical matrix.
         """
         D = test_pvmat.shape[0] * test_pvmat.shape[1]
 
@@ -365,9 +686,71 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, threshold
 
-    def _direct_threshold_nonsymmetric(self, test_pvmat, alpha):
+    def _fdr_threshold_nonsymmetric(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
         """
-        Filtra p-value su matrice non simmetrica con soglia fissa.
+        False Discovery Rate for non-symmetrical matrix (e.g., bipartite).
+
+        Parameters
+        ----------
+        - test_pvmat : csr_matrix
+            Rectangular sparse matrix of p-values.
+        - interval : float
+            Significance level alpha.
+
+        Returns
+        -------
+        - positionvalidated : list of tuple
+            List of (i,j) indices passing the FDR threshold.
+        - pvvalidated : list of float
+            Corresponding p-values.
+        - threshold : float or None
+            Threshold value or None if none satisfies.
+        """
+        n, m = test_pvmat.shape
+        D = n * m
+
+        coo = test_pvmat.tocoo()
+        sortedpvalues = []
+        sorted_indices = []
+
+        # Consider all entries (including zeros if present; if zeros mean no test, consider only nonzeros)
+        for i, j, v in zip(coo.row, coo.col, coo.data):
+            sortedpvalues.append(v)
+            sorted_indices.append((i, j))
+
+        if not sortedpvalues:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        sorted_pairs = sorted(zip(sortedpvalues, sorted_indices))
+        sortedpvalues, sorted_indices = zip(*sorted_pairs)
+        sortedpvalues = np.array(sortedpvalues)
+
+        thresholds = np.arange(1, len(sortedpvalues) + 1) * interval / D
+        valid_indices = np.where(sortedpvalues <= thresholds)[0]
+
+        if len(valid_indices) == 0:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        thresholdpos = valid_indices[-1]
+        threshold = (thresholdpos + 1) * interval / D
+
+        positionvalidated = []
+        pvvalidated = []
+
+        for i in range(len(sortedpvalues)):
+            if sortedpvalues[i] <= threshold:
+                positionvalidated.append(sorted_indices[i])
+                pvvalidated.append(sortedpvalues[i])
+            else:
+                break
+
+        return positionvalidated, pvvalidated, threshold
+
+    def _direct_threshold_nonsymmetric_dense(self, test_pvmat, alpha):
+        """
+        Filtra p-value for non symmetrical matrix with fixed threshold.
         """
         positionvalidated = []
         pvvalidated = []
@@ -385,6 +768,40 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return positionvalidated, pvvalidated, alpha
 
+    def _direct_threshold_nonsymmetric(self, test_pvmat: csr_matrix, alpha: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
+        """
+        Filter p-values for non-symmetrical matrix with fixed threshold alpha.
+
+        Parameters
+        ----------
+        - test_pvmat : csr_matrix
+            Rectangular sparse matrix of p-values.
+        - alpha : float
+            Fixed threshold.
+
+        Returns
+        -------
+        - positionvalidated : list of tuple
+            List of (i,j) indices with p-value <= alpha.
+        - pvvalidated : list of float
+            Corresponding p-values.
+        - alpha : float or None
+            Threshold used, or None if no values found.
+        """
+        positionvalidated = []
+        pvvalidated = []
+
+        coo = test_pvmat.tocoo()
+        for i, j, v in zip(coo.row, coo.col, coo.data):
+            if v <= alpha:
+                positionvalidated.append((i, j))
+                pvvalidated.append(v)
+
+        if not positionvalidated:
+            print("No value satisfies the condition.")
+            return [], [], None
+
+        return positionvalidated, pvvalidated, alpha
 
     def _validation_threshold(self, test_pvmat, interval, method=None):
         if method=="bonferroni":
@@ -585,7 +1002,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 interaction=False, filename="graph.html", color=None, names=False):
 
         '''
-        Parametri:
+        Parameters:
 
         '''
 
@@ -598,7 +1015,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             else:
                 layout_pos = nx.spring_layout(G, k=None if len(G) <= 25 else 3 / len(G))
 
-        # Ricalcolo dello spazio di visualizzazione in base ai nodi
+        # Recalculate the display space based on the nodes
         x_coords = [pos[0] for pos in layout_pos.values()]
         y_coords = [pos[1] for pos in layout_pos.values()]
         x_margin = (max(x_coords) - min(x_coords)) * 0.2 if x_coords else 1
@@ -607,7 +1024,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         x_range = (min(x_coords) - x_margin, max(x_coords) + x_margin)
         y_range = (min(y_coords) - y_margin, max(y_coords) + y_margin)
 
-        # Crea figura adattiva
+        # Create adaptive figure
         plot = figure(
             title="Graph Visualization",
             x_range=x_range,
@@ -632,7 +1049,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             if isinstance(color, dict) and all(n in color for n in node_list):
                 fill_colors = [color[node] for node in node_list]
             else:
-                # Avvisa se il colore fornito è sbagliato (solo internamente, senza print)
+                # Warn if the provided color is invalid (internally only, without print)
                 fill_colors = [
                     Spectral4[0] if node in top_nodes else Spectral4[1]
                     for node in node_list
@@ -644,25 +1061,25 @@ class RelatednessMetrics(MatrixProcessorCA):
                 fill_colors = [Spectral4[0] for _ in node_list]
 
 
-        # Nodo renderer con bordo e opacità
+        # Node renderer with border and opacity
         graph_renderer.node_renderer.data_source.data = {
             "index": node_indices,
             "fill_color": fill_colors
         }
 
-        # Nodo principale
+        # Main node
         graph_renderer.node_renderer.glyph = Circle(
             #size=node_size,
             radius=node_size / 100,
 
             fill_color="fill_color",
-            line_color="dimgrey",   # bordo nero
-            line_width=2,         # spessore bordo
-            fill_alpha=0.9,        # opacità
+            line_color="dimgrey",   # black border
+            line_width=2,         # border thickness
+            fill_alpha=0.9,        # opacity
 
         )
 
-        # Interaction: hover & selection (stesse feature estetiche)
+        # Interaction: hover & selection (same aesthetic features)
         if interaction:
             graph_renderer.node_renderer.selection_glyph = Circle(
                 #size=node_size,
@@ -726,7 +1143,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         graph_renderer.layout_provider = StaticLayoutProvider(graph_layout=graph_layout)
         plot.renderers.append(graph_renderer)
 
-        # Etichette (solo se names=True)
+        # Labels (only if names=True)
         if names:
             x, y, labels = [], [], []
             for node in G.nodes():

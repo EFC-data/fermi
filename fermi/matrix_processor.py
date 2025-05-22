@@ -82,7 +82,7 @@ class MatrixProcessorCA:
         graph = BipartiteGraph()
         graph.set_biadjacency_matrix(submat)
         graph.solve_tool(linsearch=True, verbose=False, print_error=False, model='biwcm_c')
-        avg = graph.avg_mat
+        avg = graph.get_bicm_matrix()
         inv_avg = np.divide(np.ones_like(avg), avg, where=avg > 0)
         inv_avg[inv_avg == np.inf] = 0
         ica_sub = submat.multiply(sp.csr_matrix(inv_avg))

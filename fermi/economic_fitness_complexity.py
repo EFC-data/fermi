@@ -311,12 +311,14 @@ class efc(MatrixProcessorCA):
 
         # Normalize Mcp by diversification (rows) to get Pcp
         div = diversification.astype(float)
-        inverse_div = diags(np.where(div != 0, 1.0 / div, 0.0))
+        with np.errstate(divide='ignore'):
+            inverse_div = diags(np.where(div != 0, 1.0 / div, 0.0))
         Pcp = inverse_div.dot(Mcp)  # shape: (n_countries, n_products)
 
         # Normalize Mcp by ubiquity (columns) to get Ppc
         ubi = ubiquity.astype(float)
-        inverse_ubi = diags(np.where(ubi != 0, 1.0 / ubi, 0.0))
+        with np.errstate(divide='ignore'):
+            inverse_ubi = diags(np.where(ubi != 0, 1.0 / ubi, 0.0))
         Mpc = Mcp.transpose()  # shape: (n_products, n_countries)
         Ppc = inverse_ubi.dot(Mpc)  # normalize rows = columns of Mcp
 

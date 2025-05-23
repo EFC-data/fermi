@@ -89,17 +89,30 @@ class MatrixProcessorCA:
         Compute Revealed Comparative Advantage (RCA) and replace processed matrix.
 
         The RCA is defined as:
-            RCA_{i,j} = (X_{i,j} / X_{i,·}) * (X_{i,j} / X_{·,j}) * sqrt(X_{·,·})
-
+            RCA_{i,j} = (X_{i,j} / X_{i,·}) / (X_{·,j} / X_{·,·})
+            where j is the column, i is the row.
+            
         Returns
         -------
         MatrixProcessorCA
             The instance itself, with `_processed` updated to RCA matrix.
         """
         mat = self._processed
+        
+        # Compute the square root of the total sum of all matrix entries (used for normalization)
         val = np.sqrt(mat.sum().sum())
+        
+        # Compute scaling vector for columns (products): val / col_sum
+        # where col_sum > 0 to avoid division by zero
         s0 = np.divide(val, mat.sum(0), where=mat.sum(0) > 0)
+
+        # Compute scaling vector for rows (countries): val / row_sum
+        # where row_sum > 0 to avoid division by zero
         s1 = np.divide(val, mat.sum(1), where=mat.sum(1) > 0)
+            
+        # Compute RCA as: RCA[i,j] = mat[i,j] * s0[j] * s1[i]
+        # Equivalent to: mat * (val / col_sum) * (val / row_sum)
+
         rca = mat.multiply(s0).multiply(s1)
         self._processed = rca.tocsr()
         return self

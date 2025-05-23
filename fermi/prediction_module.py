@@ -162,8 +162,6 @@ class ECPredictor:
 # 4. The class should handle a vector of weights (one relative to the Fitness direction and one relative to the GDP direction).
 # 5. The class should be able to find those points which the predicted distro is not gaussian but multimodal.
 
-import numpy as np
-import pandas as pd
 from scipy.stats import norm
 from scipy.spatial import distance_matrix
 
@@ -385,8 +383,8 @@ class SPS_Forecaster:
         var_delta_X = np.einsum('ijy,ijyd->id', wgt, tovar) / wgt_den
       
         if extended:
-            return avg_delta_X, var_delta, predict_target + avg_delta, wgt, delta_X
-        return avg_delta, var_delta, predict_target + avg_delta
+            return avg_delta_X, var_delta_X, predict_target + avg_delta_X, wgt, delta_X
+        return avg_delta_X, var_delta_X, predict_target + avg_delta_X
 
     # ------------------------------------------------------------------
     # Kernel regression wrapper (vectorized for all actors)

@@ -213,31 +213,31 @@ class RelatednessMetrics(MatrixProcessorCA):
         else:
             network = self._processed
 
-        diversification = np.array(network.sum(axis=1)).flatten()  # shape (n,)
+        # Step 1: diversificazione (normalizzazione righe)
+        diversification = np.array(network.sum(axis=1)).flatten()
+        with np.errstate(divide='ignore'):
+            inv_div = np.where(diversification != 0, 1.0 / diversification, 0.0)
+        div_diag = csr_matrix((inv_div, (np.arange(len(inv_div)), np.arange(len(inv_div)))), shape=(len(inv_div), len(inv_div)))
+        m_div = div_diag.dot(network)
 
-        # Normalizza ogni riga dividendo per la diversificazione corrispondente
-        # Evita divisioni per zero usando np.divide con 'where'
-        div_diag = csr_matrix((1.0 / diversification, (np.arange(len(diversification)), np.arange(len(diversification)))), shape=(len(diversification), len(diversification)))
-        div_diag.eliminate_zeros()
+        # Step 2: prodotto intermedio
+        intermediate = network.T.dot(m_div)
 
-        m_div = div_diag.dot(network)  # normalizza le righe di network
-
-        intermediate = network.T.dot(m_div).tocoo()
-
+        # Step 3: normalizzazione per ubiquità – TUTTE LE COPPIE (i,j)
+        n = intermediate.shape[0]
         ubiquity = np.array(network.sum(axis=0)).flatten()
 
-        row = intermediate.row
-        col = intermediate.col
-        data = intermediate.data
-
-        ubi_max = np.maximum(ubiquity[row], ubiquity[col])
+        # Costruzione esplicita di matrice dei pesi 1 / max(ubiq_i, ubiq_j)
+        row_idx, col_idx = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
+        max_ubiq = np.maximum(ubiquity[row_idx], ubiquity[col_idx])
         with np.errstate(divide='ignore'):
-            weights = np.where(ubi_max != 0, 1.0 / ubi_max, 0.0)
+            weights = np.where(max_ubiq != 0, 1.0 / max_ubiq, 0.0)
 
-        taxonomy_data = data * weights
-        taxonomy = csr_matrix((taxonomy_data, (row, col)), shape=intermediate.shape)
+        # Applichiamo la moltiplicazione elemento per elemento
+        taxonomy_dense = intermediate.toarray() * weights
 
-        return taxonomy
+        return csr_matrix(taxonomy_dense)
+
 
     def _assist_dense(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
         """

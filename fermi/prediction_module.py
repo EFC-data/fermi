@@ -156,340 +156,518 @@ class ECPredictor:
     
 
 ### Issue: _get_analogues() method to be fixed
-class SPSbForecaster:    
+# 1. The class should handle the case when the user wants to predict a point (a set of points) that is (are) not present in the state matrix.
+# 2. The class should return the vector field relative to the state matrix at a fixed delta_t.
+# 3. The class should take as input a vector of sigmas (one relative to the Fitness direction and one relative to the GDP direction).
+# 4. The class should handle a vector of weights (one relative to the Fitness direction and one relative to the GDP direction).
+# 5. The class should be able to find those points which the predicted distro is not gaussian but multimodal.
+
+import numpy as np
+import pandas as pd
+from scipy.stats import norm
+from scipy.spatial import distance_matrix
+
+class SPS_Forecaster:
+    """
+    Generalized SPSb Forecaster supporting N-dimensional state trajectories,
+    separate Nadaraya–Watson regression, bootstrap sampling, and velocity forecast,
+    with flexibility to use a distinct target variable.
+    """
     def __init__(self,
-                 fitness_df: pd.DataFrame,
-                 GDP_pc_df: pd.DataFrame,
+                 data_dfs: dict[str, pd.DataFrame],
                  delta_t: int = 5,
                  sigma: float = 0.5,
                  n_boot: int = 1000,
                  seed: int | None = None) -> None:
-    
         """
-        Inizialize the Bootstrap Selective Predictability Scheme (SPSb) forecaster.
-
         Parameters
         ----------
-        - fitness_df : pd.DataFrame
-            Rows represent actors, columns represent years (int).
-            Values are positive fitness scores.
-        - gdp_df : pd.DataFrame
-            Same shape,index, and columns as ``fitness_df`` with PPP‑adjusted
-            GDP per capita (constant prices), rows = actors, columns = years.
-        - delta_t : int, default 5
-            Forecast horizon in years.
-        - sigma : float, default 0.5
-            Gaussian kernel bandwidth in (log F, log GDP) space.
-        - n_boot : int, default 1000
-            Number of bootstrap batches.
-        - seed : int or None, default None
-            Seed for the internal random number generator.
-
-        Attributes
-        ----------
-        state_matrix : pd.DataFrame
-            MultiIndex DataFrame indexed by (year, actor), with columns ["logF", "logGDP"].
+          - data_dfs : dict[str, DataFrame]
+              Mapping from dimension name to DataFrame of state variables (actors × years).
+          - delta_t : int
+              Forecast horizon.
+          - sigma : float
+              Kernel bandwidth.
+          - n_boot : int
+              Number of bootstrap samples.
+          - seed : int or None
+              Random seed.
         """
-        self._validate_inputs(fitness_df, GDP_pc_df)
-        self.fitness = fitness_df.astype(float)
-        self.gdp = GDP_pc_df.astype(float)
+        # Validate input DataFrames share index/columns
+        labels = list(data_dfs.keys())
+        if not labels:
+            raise ValueError("Provide at least one DataFrame in data_dfs.")
+        ref = data_dfs[labels[0]]
+        for df in data_dfs.values():
+            if df.shape != ref.shape or not (df.index.equals(ref.index) and df.columns.equals(ref.columns)):
+                raise ValueError("All DataFrames must share identical index and columns.")
+        self.actors = list(ref.index)
+        self.years = list(ref.columns)
+        self.dim_names = labels
+      
+        # Build numpy trajectory: (N_actors, N_years, N_dims)
+        arrays = [df.values for df in data_dfs.values()]
+        self.traj = np.stack(arrays, axis=-1).astype(float)
         self.delta_t = int(delta_t)
-        
-        self.sigma = sigma
+        self.sigma = float(sigma)
         self.n_boot = int(n_boot)
         self.rng = np.random.default_rng(seed)
+      
+        # Build pandas state matrix for lookup
+        stacked = [pd.DataFrame(df).stack().rename(name) for name, df in data_dfs.items()]
+        state = pd.concat(stacked, axis=1)
+        state.index.names = ['actor','year']
+        self.state_matrix = state.dropna()
         
-        # Pre‑compute log‑transformed state matrix once for all.
-        self.state_matrix = self._build_state_matrix()
+        ### Placeholders for chainable results ###
+    
+        # bootstrap
+        self._mu_boot = None
+        self._sigma_boot = None
+        self._samples_boot = None
+
+        # Nadaraya–Watson 
+        self._avg_nw = None
+        self._var_nw = None
+        self._pred_nw = None
+        self._wgt_nw = None
+        self._deltaX_nw = None
         
+        # Velocity prediction 
+        self._mu_vel = None
+        self._sigma_vel = None
+        self._pred_vel = None
+
     # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------    
-    def predict_SPSb(self, actor: str, year: int, use_velocity: bool = False,
-                     return_distro: bool = False) -> Union[tuple[np.ndarray, np.ndarray],
-                      tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    # Core kernel regression: Nadaraya–Watson
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _nad_wat_regression(traj: np.ndarray,
+                             d: int,
+                             sigma: float = 0.3,
+                             target: np.ndarray | None = None,
+                             predict_points: np.ndarray | None = None,
+                             avoid_self: bool = True,
+                             extended: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Predict (log F, log GDP) at ``year + delta_t`` for a specific *actor*.
-        
+        Perform Nadaraya–Watson kernel regression to forecast state evolution.
+
         Parameters
         ----------
-          - actor : str
-              Code of the target actor.
-          - year : int
-              Base year for the forecast; must satisfy year + delta_t in data.
-          - use_velocity : bool, default False
-              If True, combine SPSb forecast with naive velocity prediction.
-          - return_distro : bool, default False
-              If True, also return the full bootstrap sample distribution.
+          - traj : np.ndarray
+              Array of trajectories for each actor over time.
+              Shape: (N_actors, N_years, N_dims) or (N_actors, N_years) for 1D.
+          - d : int
+              Forecast horizon (number of time steps to project forward).
+          - sigma : float, default 0.3
+              Bandwidth of the Gaussian kernel used to compute weights.
+          - target : np.ndarray, optional
+              Optional array of target variables to predict. Must have same shape as traj
+              on the first two axes. If None, the target is assumed to be equal to traj.
+          - predict_points : np.ndarray, optional
+              Optional array of shape (N_predict, N_dims) specifying points from which to start
+              predictions. If None, use the last point in each trajectory.
+          - avoid_self : bool, default True
+              If True, prevents an actor from using its own past as an analogue when predicting itself.
+          - extended : bool, default False
+              If True, returns extra outputs (weights and deltas).
 
         Returns
         -------
-        x : np.ndarray, shape (2,)
-            Forecasted point [logF, logGDP]. 
-            If `use_velocity=True`, this is the mean of the combined distribution.
-        sigma : np.ndarray, shape (2,)
-            Component-wise standard deviation (1σ uncertainty). 
-            If `use_velocity=True`, this is the std dev of the combined distribution.
-        samples : np.ndarray, shape (n_boot, 2), optional
-            Bootstrap distribution of SPSb forecasted points (only if return_distribution=True).
+          - avg_delta : np.ndarray, shape (N_predict, N_dims)
+              Expected displacement vectors computed as a weighted average.
+          - var_delta : np.ndarray, shape (N_predict, N_dims)
+              Variance of the displacements (measure of uncertainty).
+          - prediction : np.ndarray, shape (N_predict, N_dims)
+              Forecasted positions = predict_points + avg_delta.
         """
+      
+        # if no specific starting points of the predictions are given,
+        # then predict from the end of trajectories
+        if predict_points is None:
+            pp = None
+            predict_points = traj[:, -1]
+        else:
+            pp = True
+          
+        # Ensure 3D: if in the trajectories only a single quantity
+        # over years per actor is considered, i.e
+        #
+        # traj = np.array([
+        #     [1.0, 1.2, 1.5, 1.6],  # actor 1 
+        #     [2.0, 2.1, 2.3, 2.4],  # actor 2
+        #     [0.9, 1.0, 1.1, 1.3]   # actor 3
+        #     ])
+        #
+        # shape: (3 actors, 4 years, 1 quanty ~ GDP)
+        #
+        # then add a newaxis to have tensor form as in higher dimensional cases
+        if traj.ndim == 2:
+            traj = traj[:, :, np.newaxis]
+        ndims = traj.shape[-1]
         
-        # Choose a target *actor* in the phase space at a certain *year*
-        x_target = self._get_state(actor, year)
-        # get all the points of the phase space up to *year* and their displacement
-        # vectors consitent with a delta_t time window
-        X, dX = self._get_analogues(year)
-        # generate the gaussian weights
-        weights = self._kernel_weights(X, x_target)
-        # normalize the wieghts
-        probs = weights / weights.sum()
-        n = len(dX)
-        
+        # example for higher dimensional case: two quantities over years per actor
+        # traj = np.array([
+        #     [[1.0, 10.0], [1.2, 10.5], [1.5, 10.7], [1.6, 10.8]],  # actor 1
+        #     [[2.0, 20.0], [2.1, 20.1], [2.3, 20.3], [2.4, 20.4]],  # actor 2
+        #     [[0.9, 9.0],  [1.0, 9.5],  [1.1, 9.8],  [1.3, 9.9]]    # actor 3
+        #     ])
+        # shape: (3 actors, 4 years, 2 quantities ~ (Fitness, GDP))
+    
+        # Target default = traj
+        if target is None:
+            target = traj
+            predict_target = predict_points
+        else:
+            if target.ndim == 2:
+                target = target[:, :, np.newaxis]
+            assert target.shape[:2] == traj.shape[:2]
+            predict_target = target[:, -1]
+          
+        # Replace inf with nan
+        target[np.isinf(target)] = np.nan
+        traj[np.isinf(traj)] = np.nan
+      
+        # compute delta X for each trajectory
+        delta_X = target[:, d:] - target[:, :-d]
+        # starting positions of all delta X
+        starting_pos = traj[:, :-d]
+      
+        # Compute distance tensor
+        # dm[i,j,k]: distance between last point of country i from point of country j in year k
+        dm = distance_matrix(predict_points, starting_pos.reshape(-1, ndims))
+        dm = dm.reshape(predict_points.shape[0], traj.shape[0], -1)
+      
+        # Avoid self
+        if avoid_self and (pp is None):
+            for i in range(traj.shape[0]):
+                dm[i, i] = np.inf   # In this way dm[i,i,:] is always np.inf, so kernel weights [i,i]
+                                    # will always be 0.
+              
+        # compute regression weights from a gaussian kernel
+        wgt = norm.pdf(dm, 0, sigma)
+      
+        # Mask invalid in traj
+        # if any point is nan in traj, set their weight and delta to 0, so they don't affect predictions
+        cou, years, _ = np.where(np.isnan(traj) | np.isinf(traj))
+        for c, y in zip(cou, years):
+            if y < wgt.shape[2]:
+                wgt[:, c, y] = 0
+                delta_X[c, y] = 0
+            if y - d >= 0:
+                delta_X[c, y - d] = 0
+                wgt[:, c, y - d] = 0
+              
+        # Mask invalid in target; same logic as in traj
+        if not np.allclose(np.nansum(target), np.nansum(traj)):
+            cou, years, _ = np.where(np.isnan(target) | np.isinf(target))
+            for c, y in zip(cou, years):
+                if y < wgt.shape[2]:
+                    wgt[:, c, y] = 0
+                    delta_X[c, y] = 0
+                if y - d >= 0:
+                    delta_X[c, y - d] = 0
+                    wgt[:, c, y - d] = 0
+                  
+        # compute the Nadaraya-Watson denominator
+        wgt_den = wgt.sum(-1).sum(-1)[:, np.newaxis]
+        # if some kernel regression has all-0 weights
+        # set denominator to NaN, to have NaN as an output instead of inf
+        wgt_den[wgt_den == 0] = np.nan
+      
+        # Average displacement for each actor in each target's dimension
+        avg_delta_X = np.einsum('ijy,jyd->id', wgt, delta_X) / wgt_den
+      
+        # average quadratic deviations from the average displacement:
+        # tovar[ijyd]: quadratic deviation of delta of country j in year y from avg_delta[i,d]
+        tovar = (delta_X[np.newaxis] - avg_delta_X[:, np.newaxis, np.newaxis])**2
+        tovar[np.isnan(tovar)] = 0
+        var_delta_X = np.einsum('ijy,ijyd->id', wgt, tovar) / wgt_den
+      
+        if extended:
+            return avg_delta_X, var_delta, predict_target + avg_delta, wgt, delta_X
+        return avg_delta, var_delta, predict_target + avg_delta
+
+    # ------------------------------------------------------------------
+    # Kernel regression wrapper (vectorized for all actors)
+    # ------------------------------------------------------------------
+    def get_Nad_Wat_regression(self,
+                            predict_points: np.ndarray | None = None,
+                            target: np.ndarray | None = None,
+                            avoid_self: bool = True,
+                            extended: bool = False) -> "SPS_Forecaster":
+        """
+        Chainable wrapper for Nadaraya–Watson regression on the stored traj.
+        Parameters
+        ----------
+            - predict_points : np.ndarray, optional
+                Optional array of shape (N_predict, N_dims) specifying points from which to start
+                predictions. If None, use the last point in each trajectory.
+            - target : np.ndarray, optional
+                Optional array of target variables to predict. Must have same shape as traj
+                on the first two axes. If None, the target is assumed to be equal to traj.
+            - avoid_self : bool, default True
+                If True, prevents an actor from using its own past as an analogue when predicting itself.
+            - extended : bool, default False
+                If True, returns extra outputs (weights and deltas).
+
+        Returns
+        -------
+          - self : SPS_Forecaster
+            Chainable return containing:
+               - self._avg_nw : np.ndarray, shape (N_predict, N_dims)
+               - self._var_nw : np.ndarray, shape (N_predict, N_dims)
+               - self._pred_nw : np.ndarray, shape (N_predict, N_dims)
+               - self._wgt_nw, self._deltaX_nw if extended=True
+        """
+        avg, var, pred = self._nad_wat_regression(
+            traj=self.traj,
+            d=self.delta_t,
+            sigma=self.sigma,
+            target=target,
+            predict_points=predict_points,
+            avoid_self=avoid_self,
+            extended=False
+        )
+        self._avg_nw = avg
+        self._var_nw = var
+        self._pred_nw = pred
+        if extended:
+            wgt, dX = self._nad_wat_regression(
+                traj=self.traj,
+                d=self.delta_t,
+                sigma=self.sigma,
+                target=target,
+                predict_points=predict_points,
+                avoid_self=avoid_self,
+                extended=True
+            )[3:]
+            self._wgt_nw = wgt
+            self._deltaX_nw = dX
+        return self
+
+    # ------------------------------------------------------------------
+    # Bootstrap sampling of predictions
+    # ------------------------------------------------------------------   
+    def _bootstrap(self,
+                  predict_points: np.ndarray | None = None,
+                  target: np.ndarray | None = None,
+                  avoid_self: bool = True,
+                  return_samples: bool = False) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Perform bootstrap on historical deltas weighted by kernel to obtain
+        a distribution of future predictions.
+
+        Returns
+        -------
+          - mu : np.ndarray, shape (N_dims,)
+              Mean forecasted displacement added to predict_point.
+          - sigma : np.ndarray, shape (N_dims,)
+              Standard deviation of forecast.
+          - samples : np.ndarray, shape (n_boot, N_dims), optional
+              If return_samples=True, full bootstrap samples.
+        """
+
+        # Get weights and delta_x
+        _, _, _, wgt, deltas = self._nad_wat_regression(
+            self.traj, self.delta_t, self.sigma,
+            target, predict_points, avoid_self, debug=True
+        )
+      
+        # Flatten for sampling
+        w_flat = wgt.reshape(-1)
+        d_flat = deltas.reshape(-1, self.traj.shape[-1])
+        p_sum = w_flat.sum()
+      
+        if p_sum == 0:
+            raise ValueError("All weights zero: no valid analogues.")
+          
+        probs = w_flat / p_sum
+        n = len(probs)
+        samples = np.empty((self.n_boot, self.traj.shape[-1]))
+
         # Bootstrap sampling of displacement vectors
-        samples = np.empty((self.n_boot, 2))
         for b in range(self.n_boot):
             # Create a sample of n different vectors among the displacement vectors 
             idx = self.rng.choice(n, size=n, replace=True, p=probs)
             # Compute the (mean) forecast displacement in the phase space  
-            dX_sample = dX[idx].mean(axis=0)
-            samples[b] = x_target + dX_sample
-            
-        x_spsb = samples.mean(axis=0)
-        sigma_spsb = samples.std(axis=0, ddof=1)
-        
-        if not use_velocity:
-            if return_distro:
-                return x_spsb, sigma_spsb, samples
-            return x_spsb, sigma_spsb
-        
-        # Velocity-based prediction
-        x_vel, sigma_vel = self.predict_velocity(actor, year)
-
-        # Combine two Gaussian forecasts
-        # SPSb ~ N(x_spsb, sigma_spsb^2)
-        # Velocity ~ N(x_vel, sigma_vel^2)
-        #
-        # Derivation of the fused mean via Maximum Likelihood:
-        #
-        # Suppose we have two independent observations x1, x2 of the same unknown μ,
-        # where:
-        #   x1 ~ N(μ, σ1^2)
-        #   x2 ~ N(μ, σ2^2)
-        #
-        # The joint likelihood is:
-        #   L(μ) ∝ exp[-(x1 - μ)^2 / (2σ1^2)] * exp[-(x2 - μ)^2 / (2σ2^2)]
-        #        = exp[- ( (x1 - μ)^2 / (2σ1^2) + (x2 - μ)^2 / (2σ2^2) ) ]
-        #
-        # Maximizing log L(μ) gives:
-        #   d/dμ log L = (x1 - μ)/σ1^2 + (x2 - μ)/σ2^2 = 0
-        #   μ * (1/σ1^2 + 1/σ2^2) = x1/σ1^2 + x2/σ2^2
-        #   => μ = (x1 * σ2^2 + x2 * σ1^2) / (σ1^2 + σ2^2)
-        #
-        # Applied here with:
-        #   x1 = x_spsb, σ1 = sigma_spsb
-        #   x2 = x_vel,  σ2 = sigma_vel
-        #
-        # Final distribution:
-        #   x_spsb_vel = (x_spsb * sigma_vel^2 + x_vel * sigma_spsb^2) / (sigma_spsb^2 + sigma_vel^2)
-        #   sigma^2_spsb_vel = (sigma_spsb^2 * sigma_vel^2) / (sigma_spsb^2 + sigma_vel^2)
-
-        var_spsb = sigma_spsb ** 2
-        var_vel = sigma_vel ** 2
-        denom = var_spsb + var_vel
-
-        x_spsb_vel = (x_spsb * var_vel + x_vel * var_spsb) / denom
-        sigma_spsb_vel = np.sqrt((var_spsb * var_vel) / denom)
-
-        if return_distro:
-            return x_spsb_vel, sigma_spsb_vel, samples
-        return x_spsb_vel, sigma_spsb_vel
-             
+            mean_d = d_flat[idx].mean(axis=0)
+            samples[b] = (predict_points if predict_points is not None else self.traj[:, -1])[0] + mean_d
+          
+        mu_boot = samples.mean(axis=0)
+        sigma_boot = samples.std(axis=0, ddof=1)
+      
+        if return_samples:
+            return mu_boot, sigma_boot, samples
+        return mu_boot, sigma_boot
     
-    def predict_velocity(self, actor: str, year: int) -> tuple[np.ndarray, np.ndarray]:
+    # ------------------------------------------------------------------
+    # Bootstrap wrapper (vectorized for all actors)
+    # ------------------------------------------------------------------
+    def get_bootstrap(self,
+                     target: np.ndarray | None = None,
+                     avoid_self: bool = True,
+                     return_samples: bool = False
+                     ) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Forecast (log F, log GDP) at year + delta_t using only the country's past velocity.
-        x_c,t+Δt = x_c,t + δx_c_past where δx_c_past = x_c,t* - x_c,t*−Δt.
-        This forecast does not look at other actors (no analogues), 
-        but assumes that the target actor continues to move exactly as it did in the 
-        previous time step.
+        Vectorized bootstrap forecast for all actors.
 
         Parameters
         ----------
-          - actor : str
-              Code of the target actor.
-          - year : int
-              Base year for the forecast; must satisfy year - delta_t in data.
+          - target : np.ndarray, optional
+              Optional external target array.
+          - avoid_self : bool, default True
+              Whether to exclude self-past in regression.
+          - return_samples : bool, default False
+              If True, return full bootstrap sample matrix.
 
         Returns
         -------
-          - x_naive : np.ndarray, shape (2,)
-              Forecasted point [logF, logGDP] based on past delta_t displacement.
-          - sigma_naive : np.ndarray, shape (2,)
-              Standard deviation of past one-year-displacements, used as uncertainty estimate.
-
-        Raises
-        ------
-          - ValueError
-              If required historical data is missing for computing the past velocity.
+          - self : SPS_Forecaster
+                Chainable return containing:
+                    - self._mu_boot : np.ndarray, mean displacement (N_actors × N_dims)
+                    - self._sigma_boot : np.ndarray, std dev of displacement
+                    - self._samples_boot : np.ndarray, bootstrap samples (n_boot, N_actors, N_dims)
+                      if return_samples=True
         """
-        try:
-            x_t = self._get_state(actor, year)
-            x_t_minus_dt = self._get_state(actor, year - self.delta_t)
-        except ValueError as e:
-            raise ValueError("Cannot compute past velocity: missing historical data.") from e
+        pts = self.traj[:, -1, :]
+        mus = []
+        sigs = []
+        all_samples = []
+        for i in range(pts.shape[0]):
+            out = self._bootstrap(predict_points=pts[i:i+1], target=target,
+                                 avoid_self=avoid_self, return_samples=return_samples)
+            if return_samples:
+                m, s, samp = out
+                all_samples.append(samp)
+            else:
+                m, s = out
+            mus.append(m)
+            sigs.append(s)
+        # Stack results per actor
+        self._mu_boot = np.vstack(mus)
+        self._sigma_boot = np.vstack(sigs)
+        if return_samples:
+            # assemble samples into shape (n_boot, N_actors, N_dims)
+            self._samples_boot = np.stack(all_samples, axis=1)
+        return self
 
-        delta_x_past = x_t - x_t_minus_dt
-
-        # Estimate variance from annual displacements over the past one-year-displacements
-        try:
-            x_series = np.array([
-                self._get_state(actor, y)
-                for y in range(year - self.delta_t + 1, year + 1)
-            ])
-        except ValueError:
-            raise ValueError("Cannot compute velocity uncertainty: incomplete annual history.")
-
-        diffs = x_series[1:] - x_series[:-1]  # shape (delta_t - 1, 2)
-        sigma_naive = diffs.std(axis=0, ddof=1)
-        x_naive = x_t + delta_x_past
-        return x_naive, sigma_naive
-    
     # ------------------------------------------------------------------
-    # Internal methods
+    # Velocity-based forecast (global average velocity bootstrap)
     # ------------------------------------------------------------------
     @staticmethod
-    def _validate_inputs(fit: pd.DataFrame, gdp: pd.DataFrame):
-        if fit.shape != gdp.shape or not (
-           fit.index.equals(gdp.index) and fit.columns.equals(gdp.columns)):
-            raise ValueError(
-                "fitness_df and gdp_df must have identical shape, index, and columns"
-            )
-        if (fit <= 0).any().any() or (gdp <= 0).any().any():
-            raise ValueError(
-                "All fitness and GDP values must be strictly positive to compute logarithms"
-            )
-            
-    def _build_state_matrix(self) -> pd.DataFrame:
+    def _velocity_predict(traj: np.ndarray,
+                          d: int,
+                          target: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Construct the full state matrix as a MultiIndex DataFrame.
-
-        Transforms the input fitness and GDP DataFrames (indexed by actor, columns = years)
-        into a long-form DataFrame indexed by (year, country), with columns [logF, logGDP].
-
-        Returns
-        -------actor
-          - pd.DataFrame
-              MultiIndex DataFrame indexed by (year, actor), containing
-              columns 'logF' and 'logGDP' (natural logarithms of input data),
-              with any rows containing NaN values dropped.
+        Compute average velocity and variance over entire history, scaled by d.
+        traj: np.array, shape (N_actors, N_years, N_dims) or (N_actors, N_years)
+        d: int, time-delay (horizon)
+        target: int dimension index for which to return specific component (optional)
+        Returns (mean, var, pred) arrays of shape (N_actors, N_dims) or (N_actors, 1).
         """
-            
-        # Create MultiIndex (year, country) with columns [logF, logGDP]
-        log_f = np.log(self.fitness.T).stack().rename("logF")
-        log_g = np.log(self.gdp.T).stack().rename("logGDP")
-        state = pd.concat([log_f, log_g], axis=1)
-        state.index.names = ["year","actor"]
-        return state.dropna()
+        import warnings
+        # Ensure 3D
+        if traj.ndim == 2:
+            traj = traj[:, :, np.newaxis]
+        # Compute diffs year-to-year
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Mean of empty slice")
+            warnings.filterwarnings("ignore", message="Degrees of freedom")
+            # average one-step diff then scale
+            mean = np.nanmean(np.diff(traj, axis=1), axis=1) * d
+            var = np.nanvar (np.diff(traj, axis=1), axis=1) * d
+        # If user requested a specific target dimension
+        if target is not None:
+            if target < 0 or target >= traj.shape[-1]:
+                raise ValueError('target must be a valid dimension index', target, traj.shape[-1])
+            # select that dimension
+            m = mean[..., target][:, np.newaxis]     # '...' numpy ellipsis operator
+            v = var[..., target][:, np.newaxis]
+            p = traj[:, -1, target][:, np.newaxis] + m
+            return m, v, p
+        # else return full
+        p = traj[:, -1, :] + mean
+        return mean, var, p
     
-    def _get_state(self, actor: str, year: int) -> np.ndarray:
+    # ------------------------------------------------------------------
+    # velocity predictor wrapper (vectorized for all actors)
+    # ------------------------------------------------------------------
+    def get_velocity_predict(self,
+                             target: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Retrieve the 2D state vector (logF, logGDP) for a given actor and year.
+        CHainable velocity forecast for all actors based on historical average velocity.
 
         Parameters
         ----------
-          - actor : str
-              Code of the actor to retrieve.
-          - year : int
-              Year to retrieve.
+          - target : int or None
+              If provided, selects a single target dimension index; otherwise returns all dims.
 
         Returns
         -------
-          - np.ndarray, shape (2,)
-              Array containing [logF, logGDP] for the given actor and year.
-
-        Raises
-        ------
-          - ValueError
-              If the (actor, year) pair is not found in the state matrix.
+        self : SPS_Forecaster
+            Chainable return containing:
+              - self._mu_vel    : np.ndarray, mean displacement (N_actors × N_dims or ×1)
+              - self._sigma_vel : np.ndarray, standard deviation of displacement
+              - self._pred_vel  : np.ndarray, forecasted positions = last value + mean
         """
-        try:
-            return self.state_matrix.loc[(year,actor)].values
-        except KeyError as exc:
-            raise ValueError(f"State not available for the specified pair ({year},{actor})") from exc
-            
-    def _get_analogues(self, target_year: int):
-        """
-        Return arrays (X, dX) of analogues prior to target_year:
-        positions x_{i,τ} and displacements x_{i,τ+Δt} - x_{i,τ},
-        where τ + Δt <= *target_year*.
-        """
-        idx = self.state_matrix.index
-        tau = idx.get_level_values("year")
-        actor = idx.get_level_values("actor")
-
-        # Select only analogues x_{i,τ} with τ + Δt ≤ *target_year*
-        valid = tau + self.delta_t <= target_year
-        state_tau = self.state_matrix[valid]
-
-        tau_valid = tau[valid]
-        actor_valid = actor[valid]
-        tau_plus_dt = tau_valid + self.delta_t
-
-        # Build MultiIndex at τ+Δt
-        idx_next = pd.MultiIndex.from_arrays([tau_plus_dt, actor_valid], names=["year", "actor"])
-        state_tau_plus_dt = self.state_matrix.reindex(idx_next)
-
-        # drop NaN rows
-        mask = ~state_tau_plus_dt.isna().any(axis=1)
-        print("\n",mask)
-        # keep only valid rows
-        state_tau_plus_dt = state_tau_plus_dt[mask]
+        # Compute vectorized velocity predictions
+        mean, var, pred = self._velocity_predict(self.traj, self.delta_t, target)
+        # Convert var to standard deviation
+        sigma = np.sqrt(var)
         
-        # drop duplicates
-        dup_idx = state_tau.index.intersection(state_tau_plus_dt.index)   
-        state_tau = state_tau.drop(dup_idx)
+        # Store results for chaining
+        self._mu_vel = mean
+        self._sigma_vel = sigma
+        self._pred_vel = pred
 
-        print("\n Valid analogues (tau):")
-        print(state_tau)
-        print("\n Valid analogues (tau+dt):")
-        print(state_tau_plus_dt)
-        
-        X = state_tau.values
-        dX = X #WRONG TO BE FIXED 
-        
-        print("\n",dX)
-        return X, dX
-            
-    
-    def _kernel_weights(self, X: np.ndarray, x_target: np.ndarray, verbose: bool = False) -> np.ndarray:
+        return self
+
+
+    # ------------------------------------------------------------------
+    # Accessory: Combine last forecast with velocity forecast
+    # ------------------------------------------------------------------
+    def with_velocity_correction(self,
+                                 method: str = 'bootstrap',
+                                 target: int | None = None
+                                 ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Compute Gaussian kernel weights for a target point relative to a set of analogue points.
+        Apply velocity-based correction to the most recent forecast.
+
+        This method uses the historical velocity forecast (via _velocity_predict)
+        to adjust the latest Nadaraya-Watson or bootstrap forecast in a maximum-
+        likelihood fusion, yielding a new mean and uncertainty.
 
         Parameters
         ----------
-          - X : np.ndarray, shape (n, 2)
-              Array of analogue positions in log(F), log(GDP) space.
-          - x_target : np.ndarray, shape (2,)
-              Target position in log(F), log(GDP) space.
+          - method : str
+              Which forecast to correct: 'bootstrap' or 'nw' (Nadaraya-Watson).
+          - target : int or None
+              If provided, selects a single dimension index for the velocity forecast.
 
         Returns
         -------
-          - np.ndarray, shape (n,)
-              Array of kernel weights, one for each analogue point.
-
-        Raises
-        ------
-          - ValueError
-              If all computed weights are zero (e.g., sigma too small).
+          - mu_corr : np.ndarray
+              corrected forecast mean (N_actors * N_dims)
+          - sigma_corr : np.ndarray
+              corrected forecast std dev
         """
-        diff = X - x_target
-        dist2 = (diff ** 2).sum(axis=1)
-        w = np.exp(-dist2 / (2 * self.sigma ** 2))
+        # Retrieve the last forecast
+        if method.lower().startswith('nw'):
+            mu_hist   = self._pred_nw
+            sigma_hist= np.sqrt(self._var_nw)
+        else:
+            mu_hist   = self._mu_boot
+            sigma_hist= self._sigma_boot
 
-        if verbose:
-            print("square dist_i between analogues:", dist2)
-            print("weights w_i:", w)
+        # Compute velocity forecast
+        mean_vel, var_vel, pred_vel = self._velocity_predict(self.traj, self.delta_t, target)
+        sigma_vel = np.sqrt(var_vel)
 
-        if not np.any(w):
-            raise ValueError("All kernel weights are zero; try larger sigma.")
-        return w
+        # Fuse via Maximum Likelihood: μ* = (μ_hist·σ_vel² + μ_vel·σ_hist²) / (σ_hist² + σ_vel²)
+        var1 = sigma_hist**2
+        var2 = sigma_vel**2
+        mu_corr = (mu_hist * var2 + pred_vel * var1) / (var1 + var2)
+        sigma_corr = np.sqrt((var1 * var2) / (var1 + var2))
+
+        return mu_corr, sigma_corr

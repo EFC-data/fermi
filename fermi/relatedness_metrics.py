@@ -273,43 +273,25 @@ class RelatednessMetrics(MatrixProcessorCA):
         return np.dot(matrix_0_norm.T, second_matrix_norm)
 
     def _assist(self, second_matrix: csr_matrix, rows: bool = True) -> csr_matrix:
-        """
-        Compute assist matrix between the stored network and a second binary matrix.
-        Introduced by Pugliese et al. (2019)
-
-        Parameters
-        ----------
-        - second_matrix : csr_matrix
-            Second binary matrix to compare against the primary network.
-        - rows : bool, optional
-            If True, treat matrices with dimensions swapped for row-based processing.
-
-        Returns
-        -------
-        - csr_matrix
-            Assist matrix quantifying relationships between corresponding nodes.
-        """
         if rows:
             matrix_0 = self._processed.T
             second_matrix = second_matrix.T
         else:
             matrix_0 = self._processed
+            second_matrix = second_matrix  # necessario per simmetria del codice
 
         diversification = np.array(second_matrix.sum(axis=1)).flatten()
         mask = diversification > 0
 
-        # Filtra righe con diversificazione > 0
         matrix_0_filtered = matrix_0[mask]
         second_matrix_filtered = second_matrix[mask]
         diversification_filtered = diversification[mask]
 
-        # Normalizza second_matrix_filtered riga per riga dividendo per diversification
         div_diag = csr_matrix((1.0 / diversification_filtered, 
                             (np.arange(len(diversification_filtered)), np.arange(len(diversification_filtered)))), 
                             shape=(len(diversification_filtered), len(diversification_filtered)))
         second_matrix_norm = div_diag.dot(second_matrix_filtered)
 
-        # Calcola ubiquity e corregge zeri
         ubiquity = np.array(matrix_0_filtered.sum(axis=0)).flatten()
         ubiquity[ubiquity == 0] = 1.0
 
@@ -318,7 +300,6 @@ class RelatednessMetrics(MatrixProcessorCA):
                                 shape=(len(ubiquity), len(ubiquity)))
         matrix_0_norm = matrix_0_filtered.dot(div_diag_ubi)
 
-        # Prodotto finale
         assist = matrix_0_norm.T.dot(second_matrix_norm)
 
         return assist

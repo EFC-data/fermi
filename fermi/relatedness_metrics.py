@@ -28,7 +28,7 @@ from bokeh.palettes import Spectral4
 # NetworkX algorithms
 from networkx.algorithms import bipartite
 
-from .matrix_processor import MatrixProcessorCA
+from fermi.matrix_processor import MatrixProcessorCA
 
 class RelatednessMetrics(MatrixProcessorCA):
     """

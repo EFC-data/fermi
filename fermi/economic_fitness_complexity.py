@@ -5,7 +5,7 @@ from typing import Any, List, Union
 from pathlib import Path
 from scipy.sparse import csr_matrix, diags, vstack, hstack, issparse
 from scipy.sparse.linalg import eigs
-from .matrix_processor import MatrixProcessorCA
+from fermi.matrix_processor import MatrixProcessorCA
 
 class efc(MatrixProcessorCA):
     """
@@ -23,7 +23,7 @@ class efc(MatrixProcessorCA):
     """
 
     def __init__(self,
-            input_data: Union[str, MatrixProcessorCA, Path, pd.DataFrame, np.ndarray, List[Any]],
+            input_data: Union[MatrixProcessorCA, str, Path, pd.DataFrame, np.ndarray, List[Any]] = None,
             **kwargs) -> None:
         """
         Inizializes the efc class with a binary country-product matrix.
@@ -45,17 +45,18 @@ class efc(MatrixProcessorCA):
         self.shape = None
         self._empty_metrics()
 
-        if isinstance(input_data, MatrixProcessorCA):
-            # shallow‐copy lists so you don’t accidentally share them
-            self._original = (input_data._original[0].copy(), input_data._original[1].copy(), input_data._original[2].copy())
-            self._processed = input_data._processed.copy()
-            self.global_row_labels = input_data.global_row_labels
-            self.global_col_labels = input_data.global_col_labels
-            self.shape = self._processed.shape
-            self._set_labels()
+        if input_data is not None:
+            if isinstance(input_data, MatrixProcessorCA):
+                # shallow‐copy lists so you don’t accidentally share them
+                self._original = (input_data._original[0].copy(), input_data._original[1].copy(), input_data._original[2].copy())
+                self._processed = input_data._processed.copy()
+                self.global_row_labels = input_data.global_row_labels
+                self.global_col_labels = input_data.global_col_labels
+                self.shape = self._processed.shape
+                self._set_labels()
 
-        elif input_data is not None:
-            self.load(input_data, **kwargs)
+            else:
+                self.load(input_data, **kwargs)
 
     def _empty_metrics(self):
         # Placeholders for fitness and complexity metrics

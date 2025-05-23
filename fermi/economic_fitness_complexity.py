@@ -23,7 +23,7 @@ class efc(MatrixProcessorCA):
     """
 
     def __init__(self,
-            input_data: Union[str, MatrixProcessorCA, Path, pd.DataFrame, np.ndarray, List[Any]],
+            input_data: Union[MatrixProcessorCA, str, Path, pd.DataFrame, np.ndarray, List[Any]] = None,
             **kwargs) -> None:
         """
         Inizializes the efc class with a binary country-product matrix.

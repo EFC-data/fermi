@@ -16,6 +16,20 @@ class MatrixProcessorCA:
     Call get_matrices() to retrieve the current processed matrices.
     """
     def __init__(self) -> None:
+        """
+        Initialize an empty MatrixProcessorCA.
+
+        Attributes
+        ----------
+        _original : Tuple[csr_matrix, List[str], List[str]] or None
+            The original (raw) matrix and its row/column labels.
+        _processed : csr_matrix or None
+            The processed (current) matrix.
+        global_row_labels : List[str]
+            Labels for rows.
+        global_col_labels : List[str]
+            Labels for columns.
+        """
         # Storage for raw and processed matrices and their labels
         self._original: Tuple[csr_matrix, List[str], List[str]] = None
         self._processed: csr_matrix = None
@@ -31,7 +45,19 @@ class MatrixProcessorCA:
         **kwargs
         ) -> "MatrixProcessorCA":
         """
-        Load input_data as sparse matrix, store original and initialize processed as a copy.
+        Load input data as a sparse matrix, store original, and initialize processed copy.
+
+        Parameters
+        ----------
+        input_data : str or Path or DataFrame or ndarray or list
+            Path to file, DataFrame, numpy array, sparse matrix, or edge list.
+        **kwargs : dict
+            Additional keyword arguments for file readers (e.g. sep, header).
+
+        Returns
+        -------
+        MatrixProcessorCA
+            The instance itself, with `_original` and `_processed` set.
         """
         mat, rows, cols = self._load_full(input_data, **kwargs)
         # update global labels
@@ -46,8 +72,12 @@ class MatrixProcessorCA:
 
     def copy(self):  # ok with sparse
         """
-        Copy routine
-        :return: return the hard copy of the efc class
+        Create a deep copy of this processor, including matrices and labels.
+
+        Returns
+        -------
+        MatrixProcessorCA
+            A deep copy of this object.
         """
         return copy.deepcopy(self)
 
@@ -56,7 +86,15 @@ class MatrixProcessorCA:
     # -----------------------------
     def compute_rca(self) -> "MatrixProcessorCA":
         """
-        Replace each processed matrix with its RCA version.
+        Compute Revealed Comparative Advantage (RCA) and replace processed matrix.
+
+        The RCA is defined as:
+            RCA_{i,j} = (X_{i,j} / X_{i,·}) * (X_{i,j} / X_{·,j}) * sqrt(X_{·,·})
+
+        Returns
+        -------
+        MatrixProcessorCA
+            The instance itself, with `_processed` updated to RCA matrix.
         """
         mat = self._processed
         val = np.sqrt(mat.sum().sum())
@@ -68,7 +106,15 @@ class MatrixProcessorCA:
 
     def compute_ica(self) -> "MatrixProcessorCA":
         """
-        Replace each processed matrix with its ICA version.
+        Compute Inferred Comparative Advantage (ICA) and replace processed matrix.
+
+        Uses the Bipartite Weighted Configuration Model from the bicm module to obtain expected values
+        of the weighted network, used as expected value.
+
+        Returns
+        -------
+        MatrixProcessorCA
+            The instance itself, with `_processed` updated to ICA matrix.
         """
         mat = self._processed
         # check rows or columns zeros
@@ -102,7 +148,19 @@ class MatrixProcessorCA:
     # -----------------------------
     def binarize(self, threshold: float = 1) -> "MatrixProcessorCA":
         """
-        Binarize each processed matrix in-place with given threshold.
+        Binarize the processed matrix in-place using a threshold.
+
+        All entries >= threshold become 1, others 0.
+
+        Parameters
+        ----------
+        threshold : float, default=1
+            Cut-off value for binarization.
+
+        Returns
+        -------
+        MatrixProcessorCA
+            The instance itself, with `_processed` binarized.
         """
         mat = self._processed
         result = mat.tocsr()
@@ -116,7 +174,12 @@ class MatrixProcessorCA:
     # -----------------------------
     def get_matrix(self) -> csr_matrix:
         """
-        Return the list of current processed matrices.
+        Retrieve the current processed matrix.
+
+        Returns
+        -------
+        csr_matrix
+            The processed sparse matrix.
         """
         return self._processed
 

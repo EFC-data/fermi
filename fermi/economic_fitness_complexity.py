@@ -22,7 +22,9 @@ class efc(MatrixProcessorCA):
     The class supports sparse matrices, configurable initial conditions, and row/column labeling.
     """
 
-    def __init__(self) -> None:
+    def __init__(self,
+            input_data: Union[str, MatrixProcessorCA, Path, pd.DataFrame, np.ndarray, List[Any]],
+            **kwargs) -> None:
         """
         Inizializes the efc class with a binary country-product matrix.
 
@@ -40,6 +42,22 @@ class efc(MatrixProcessorCA):
         """
         super().__init__()
 
+        self.shape = None
+        self._empty_metrics()
+
+        if isinstance(input_data, MatrixProcessorCA):
+            # shallow‐copy lists so you don’t accidentally share them
+            self._original = (input_data._original[0].copy(), input_data._original[1].copy(), input_data._original[2].copy())
+            self._processed = input_data._processed.copy()
+            self.global_row_labels = input_data.global_row_labels
+            self.global_col_labels = input_data.global_col_labels
+            self.shape = self._processed.shape
+            self._set_labels()
+
+        elif input_data is not None:
+            self.load(input_data, **kwargs)
+
+    def _empty_metrics(self):
         # Placeholders for fitness and complexity metrics
         self.fitness = None
         self.complexity = None
@@ -57,7 +75,12 @@ class efc(MatrixProcessorCA):
         # Placeholders for structural metrics
         self.density = None
         self.nodf = None
-        self.shape = None
+
+    def _set_labels(self):
+        if len(self.global_row_labels) == 0:
+            self.global_row_labels = list(range(self.shape[0]))
+        if len(self.global_col_labels) == 0:
+            self.global_col_labels = list(range(self.shape[1]))
 
     def load(
             self,
@@ -67,21 +90,8 @@ class efc(MatrixProcessorCA):
         super().load(input_data, **kwargs)
 
         self.shape = self._processed.shape
-        if len(self.global_row_labels) == 0:
-            self.global_row_labels = list(range(self.shape[0]))
-        if len(self.global_col_labels) == 0:
-            self.global_col_labels = list(range(self.shape[1]))
-
-        self.fitness = None
-        self.complexity = None
-        self.ubiquity = None
-        self.diversification = None
-        self.eci = None
-        self.pci = None
-        self.eci_eig = None
-        self.pci_eig = None
-        self.density = None
-        self.nodf = None
+        self._empty_metrics()
+        self._set_labels()
 
         return self
 
@@ -756,7 +766,7 @@ class efc(MatrixProcessorCA):
 
     def get_eci_pci(
         self,
-        method: str = 'reflections',
+        method: str = 'eigenvalue',
         norm: str = 'zscore',
         max_iterations: int = 18,
         eigv: bool = False,
@@ -772,7 +782,7 @@ class efc(MatrixProcessorCA):
 
         Parameters
         ----------
-          - method : {'reflections', 'spectral'}
+          - method : {'reflections', 'eigenvalue'}
               Choice of algorithm.
           - norm : str
               How to normalize the output vectors.

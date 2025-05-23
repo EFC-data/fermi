@@ -831,6 +831,38 @@ class RelatednessMetrics(MatrixProcessorCA):
 ########    Projection wrappers    #########
 ############################################
 
+    def get_projection_dense(self, second_matrix=None, rows=True, method="cooccurrence"):
+        """
+        Compute projection matrix, given binary bipartite input.
+
+        Parameters:
+            second_matrix: Second binary matrix if method == "assist"
+            rows: boolean, if True processes rows, if False processes columns
+            methods: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
+
+        Returns:
+            numpy.ndarray: The projection matrix representing relationships between matrices
+        """
+
+        if method == "cooccurrence":
+            return self._cooccurrence_dense(rows=rows)
+
+        elif method == "proximity":
+            return self._proximity_dense(rows=rows)
+
+        elif method == "taxonomy":
+            return self._taxonomy_dense(rows=rows)
+
+        elif method == "assist":
+            if second_matrix is None:
+                raise ValueError("Second matrix is required for assist method.")
+            if sp.issparse(second_matrix):
+                second_matrix = second_matrix.toarray()
+            return self._assist_dense(second_matrix, rows=rows)
+        else:
+            raise ValueError(
+            f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
+
     def get_projection(self, second_matrix=None, rows=True, method="cooccurrence"):
         """
         Compute projection matrix, given binary bipartite input.

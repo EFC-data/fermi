@@ -865,8 +865,8 @@ class RelatednessMetrics(MatrixProcessorCA):
         elif method == "assist":
             if second_matrix is None:
                 raise ValueError("Second matrix is required for assist method.")
-            if sp.issparse(second_matrix):
-                second_matrix = second_matrix.toarray()
+            # if sp.issparse(second_matrix):
+                # second_matrix = second_matrix
             return self._assist(second_matrix, rows=rows)
         else:
             raise ValueError(

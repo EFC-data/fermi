@@ -241,68 +241,64 @@ class RelatednessMetrics(MatrixProcessorCA):
 
     def _assist_dense(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
         """
-        Compute assist matrix between the stored network and a second binary matrix.
-        Introduced by Pugliese et al. (2019)
+        Compute the assist matrix from a bipartite network.
+        Introduced by Zaccaria et al. (2014)
 
         Parameters
         ----------
-          - second_matrix : np.ndarray
-              Second binary matrix to compare against the primary network.
+          - second_matrix : csr_matrix
+              Second matrix for the assist matrix computation.
           - rows : bool, optional
-              If True, treat matrices with dimensions swapped for row-based processing.
+              If True, compute assist matrix based on row to column to row transitions; otherwise column.
 
         Returns
         -------
           - np.ndarray
-              Assist matrix quantifying relationships between corresponding nodes.
+              Assist matrix reflecting normalized transitions between nodes.
         """
-        matrix_0 = self._processed_dense.T if rows else self._processed_dense
-        second_matrix = second_matrix.T if rows else second_matrix
+        m_0 = self._processed_dense.T if rows else self._processed_dense
+        m_1 = second_matrix.T if rows else second_matrix
 
-        diversification = second_matrix.sum(axis=1)
-        mask = diversification > 0
-        matrix_0_filtered = matrix_0[mask]
-        second_matrix_filtered = second_matrix[mask]
-        diversification = diversification[mask]
+        d_1=m_1.sum(1)
+        # let us automatically select the non-empty rows in m_1
+        # and consider the summation just on them
+        _m_0=m_0[d_1>0]
+        _m_1=m_1[d_1>0]
+        d_1=d_1[d_1>0]
+        # let conside the second matrix term of the assist matrix
+        mm_1=np.divide(_m_1.T, d_1).T
 
-        second_matrix_norm = np.divide(second_matrix_filtered.T, diversification).T
-        ubiquity = matrix_0_filtered.sum(axis=0)
-        ubiquity[ubiquity == 0] = 1
-        matrix_0_norm = np.divide(matrix_0_filtered, ubiquity)
-
-        return np.dot(matrix_0_norm.T, second_matrix_norm)
+        # regarding the first term, there is the issue that if I have a product with
+        # zero ubiquity, then the assist matrix will explode. In that case all
+        # M_{cp} will be zero. Let's use a trick, then: let's calculate all ubiquities and
+        # manually set to 1 all the 0 ones: their contribution will be still 0 (due to the numerator),
+        # but we will avoid dividing by 0 in the following (and making things explode)
+        u_0=_m_0.sum(0)
+        # manually set to 1 all the 0s
+        u_0[u_0==0]=1
+        mm_0=np.divide(_m_0, u_0)
+        return np.dot(mm_0.T,mm_1)
 
     def _assist(self, second_matrix: csr_matrix, rows: bool = True) -> csr_matrix:
-        if rows:
-            matrix_0 = self._processed.T
-            second_matrix = second_matrix.T
-        else:
-            matrix_0 = self._processed
-            second_matrix = second_matrix  # necessario per simmetria del codice
+        
+        M = self._processed.T if rows else self._processed
+        M_prime = second_matrix.T if rows else second_matrix
 
-        diversification = np.array(second_matrix.sum(axis=1)).flatten()
-        mask = diversification > 0
+        d_prime = np.array(M_prime.sum(axis=1)).flatten()
+        d_prime[d_prime == 0] = 1
 
-        matrix_0_filtered = matrix_0[mask]
-        second_matrix_filtered = second_matrix[mask]
-        diversification_filtered = diversification[mask]
+        D_inv = csr_matrix((1.0 / d_prime, (np.arange(len(d_prime)), np.arange(len(d_prime)))), shape=(len(d_prime), len(d_prime)))
+        M_prime_norm = D_inv @ M_prime
 
-        div_diag = csr_matrix((1.0 / diversification_filtered, 
-                            (np.arange(len(diversification_filtered)), np.arange(len(diversification_filtered)))), 
-                            shape=(len(diversification_filtered), len(diversification_filtered)))
-        second_matrix_norm = div_diag.dot(second_matrix_filtered)
+        u = np.array(M.sum(axis=0)).flatten()
+        u[u == 0] = 1
 
-        ubiquity = np.array(matrix_0_filtered.sum(axis=0)).flatten()
-        ubiquity[ubiquity == 0] = 1.0
+        U_inv = csr_matrix((1.0 / u, (np.arange(len(u)), np.arange(len(u)))), shape=(len(u), len(u)))
 
-        div_diag_ubi = csr_matrix((1.0 / ubiquity, 
-                                (np.arange(len(ubiquity)), np.arange(len(ubiquity)))), 
-                                shape=(len(ubiquity), len(ubiquity)))
-        matrix_0_norm = matrix_0_filtered.dot(div_diag_ubi)
+        result = M.T @ M_prime_norm
+        result = U_inv @ result
 
-        assist = matrix_0_norm.T.dot(second_matrix_norm)
-
-        return assist
+        return result
 
     def _bonferroni_threshold_dense(self, test_pvmat: np.ndarray, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
         """

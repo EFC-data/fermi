@@ -865,9 +865,10 @@ class RelatednessMetrics(MatrixProcessorCA):
         elif method == "assist":
             if second_matrix is None:
                 raise ValueError("Second matrix is required for assist method.")
-            # if sp.issparse(second_matrix):
-                # second_matrix = second_matrix
+            if not sp.issparse(second_matrix):
+                second_matrix = csr_matrix(second_matrix)
             return self._assist(second_matrix, rows=rows)
+        
         else:
             raise ValueError(
             f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")

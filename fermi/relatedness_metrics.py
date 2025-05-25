@@ -843,7 +843,8 @@ class RelatednessMetrics(MatrixProcessorCA):
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method).toarray()>=empirical_projection, 1,0))
 
             else:
-                self._processed_dense = csr_matrix(sample_bicm(my_probability_matrix))
+                # self._processed_dense = csr_matrix(sample_bicm(my_probability_matrix))
+                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1,0))
 
         pvalues_matrix = np.divide(pvalues_matrix, num_iterations)

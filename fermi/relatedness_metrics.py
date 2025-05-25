@@ -64,25 +64,6 @@ class RelatednessMetrics(MatrixProcessorCA):
 ########## INTERNAL METHODS ############
 ########################################
 
-    def _cooccurrence_dense(self, rows: bool = True) -> np.ndarray:
-        """
-        Compute the cooccurrence matrix for one layer of the bipartite network.
-
-        Parameters
-        ----------
-          - rows : bool, optional
-              If True, compute cooccurrence on the row-layer; if False, on the column-layer.
-
-        Returns
-        -------
-          - np.ndarray
-              Cooccurrence matrix (square) of dimensions depending on the chosen layer.
-        """
-        if rows:
-            return self._processed_dense.dot(self._processed_dense.T)
-        else:
-            return self._processed_dense.T.dot(self._processed_dense)
-
     def _cooccurrence(self, rows: bool = True) -> csr_matrix:
         """
         Compute the cooccurrence matrix for one layer of the bipartite network.
@@ -101,33 +82,6 @@ class RelatednessMetrics(MatrixProcessorCA):
             return self._processed.dot(self._processed.T)
         else:
             return self._processed.T.dot(self._processed)
-
-    def _proximity_dense(self, rows: bool = True) -> np.ndarray:
-        """
-        Compute the proximity network from a bipartite network.
-        Introduced by Hidalgo et al. (2007)
-
-        Parameters
-        ----------
-          - rows : bool, optional
-              If True, compute proximity for row-layer; if False, for column-layer.
-
-        Returns
-        -------
-          - np.ndarray
-              Proximity matrix where elements are cooccurrence weighted by inverse ubiquity.
-        """
-        if rows:
-            cooc = self._processed_dense.dot(self._processed_dense.T)
-            ubiquity = self._processed_dense.sum(axis=1)
-        else:
-            cooc = self._processed_dense.T.dot(self._processed_dense)
-            ubiquity = self._processed_dense.sum(axis=0)
-
-        ubi_mat = np.tile(ubiquity, (len(ubiquity), 1))
-        ubi_max = np.maximum(ubi_mat, ubi_mat.T).astype(float)
-        np.divide(np.ones_like(ubi_max, dtype=float), ubi_max, out=ubi_max, where=ubi_max != 0)
-        return np.multiply(cooc, ubi_max)
 
     def _proximity(self, rows: bool = True) -> csr_matrix:
         """
@@ -165,33 +119,6 @@ class RelatednessMetrics(MatrixProcessorCA):
         proximity = csr_matrix((proximity_data, (row, col)), shape=cooc.shape)
 
         return proximity
-
-    def _taxonomy_dense(self, rows: bool = True) -> np.ndarray:
-        """
-        Compute the taxonomy network from a bipartite network.
-        Introduced by Zaccaria et al. (2014)
-
-        Parameters
-        ----------
-          - rows : bool, optional
-              If True, compute taxonomy based on row to column to row transitions; otherwise column.
-
-        Returns
-        -------
-          - np.ndarray
-              Taxonomy matrix reflecting normalized transitions between nodes.
-        """
-        network = self._processed_dense.T if rows else self._processed_dense
-        diversification = network.sum(axis=1)
-        div_mat = np.tile(diversification, (network.shape[1], 1)).T
-        m_div = np.divide(network, div_mat, where=div_mat != 0)
-        intermediate = network.T.dot(m_div)
-
-        ubiquity = network.sum(axis=0)
-        ubi_mat = np.tile(ubiquity, (network.shape[1], 1))
-        ubi_max = np.maximum(ubi_mat, ubi_mat.T).astype(float)
-        np.divide(np.ones_like(ubi_max, dtype=float), ubi_max, out=ubi_max, where=ubi_max != 0)
-        return np.multiply(intermediate, ubi_max)
 
     def _taxonomy(self, rows: bool = True) -> csr_matrix:
         """
@@ -237,47 +164,6 @@ class RelatednessMetrics(MatrixProcessorCA):
         taxonomy_dense = intermediate.toarray() * weights
 
         return csr_matrix(taxonomy_dense)
-
-
-    def _assist_dense(self, second_matrix: np.ndarray, rows: bool = True) -> np.ndarray:
-        """
-        Compute the assist matrix from a bipartite network.
-        Introduced by Zaccaria et al. (2014)
-
-        Parameters
-        ----------
-          - second_matrix : csr_matrix
-              Second matrix for the assist matrix computation.
-          - rows : bool, optional
-              If True, compute assist matrix based on row to column to row transitions; otherwise column.
-
-        Returns
-        -------
-          - np.ndarray
-              Assist matrix reflecting normalized transitions between nodes.
-        """
-        m_0 = self._processed_dense.T if rows else self._processed_dense
-        m_1 = second_matrix.T if rows else second_matrix
-
-        d_1=m_1.sum(1)
-        # let us automatically select the non-empty rows in m_1
-        # and consider the summation just on them
-        _m_0=m_0[d_1>0]
-        _m_1=m_1[d_1>0]
-        d_1=d_1[d_1>0]
-        # let conside the second matrix term of the assist matrix
-        mm_1=np.divide(_m_1.T, d_1).T
-
-        # regarding the first term, there is the issue that if I have a product with
-        # zero ubiquity, then the assist matrix will explode. In that case all
-        # M_{cp} will be zero. Let's use a trick, then: let's calculate all ubiquities and
-        # manually set to 1 all the 0 ones: their contribution will be still 0 (due to the numerator),
-        # but we will avoid dividing by 0 in the following (and making things explode)
-        u_0=_m_0.sum(0)
-        # manually set to 1 all the 0s
-        u_0[u_0==0]=1
-        mm_0=np.divide(_m_0, u_0)
-        return np.dot(mm_0.T,mm_1)
 
     def _assist(self, second_matrix: csr_matrix, rows: bool = True) -> csr_matrix:
         
@@ -792,6 +678,18 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
 
+    def _validation_threshold_dense(self, test_pvmat, interval, method=None):
+        if method=="bonferroni":
+            return self._bonferroni_threshold_dense(test_pvmat, interval)
+        elif method=="fdr":
+            return self._fdr_threshold_dense(test_pvmat, interval)
+        elif method=="direct":
+            return self._direct_threshold_dense(test_pvmat, interval)
+        #return positionvalidated, pvvalidated, threshold
+        else:
+            raise ValueError(
+            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
+
     def _validation_threshold_non_symm(self, test_pvmat, interval, method=None):
         if method=="bonferroni":
             return self._bonferroni_threshold_nonsymmetric(test_pvmat, interval)
@@ -804,43 +702,23 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
 
+    def _validation_threshold_non_symm_dense(self, test_pvmat, interval, method=None):
+        if method=="bonferroni":
+            return self._bonferroni_threshold_nonsymmetric_dense(test_pvmat, interval)
+        elif method=="fdr":
+            return self._fdr_threshold_nonsymmetric_dense(test_pvmat, interval)
+        elif method=="direct":
+            return self._direct_threshold_nonsymmetric_dense(test_pvmat, interval)
+        #return positionvalidated, pvvalidated, threshold
+        else:
+            raise ValueError(
+            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
+
 ############################################
 ########    Projection wrappers    #########
 ############################################
 
-    def get_projection_dense(self, second_matrix=None, rows=True, method="cooccurrence"):
-        """
-        Compute projection matrix, given binary bipartite input.
-
-        Parameters:
-            second_matrix: Second binary matrix if method == "assist"
-            rows: boolean, if True processes rows, if False processes columns
-            methods: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
-
-        Returns:
-            numpy.ndarray: The projection matrix representing relationships between matrices
-        """
-
-        if method == "cooccurrence":
-            return self._cooccurrence_dense(rows=rows)
-
-        elif method == "proximity":
-            return self._proximity_dense(rows=rows)
-
-        elif method == "taxonomy":
-            return self._taxonomy_dense(rows=rows)
-
-        elif method == "assist":
-            if second_matrix is None:
-                raise ValueError("Second matrix is required for assist method.")
-            if sp.issparse(second_matrix):
-                second_matrix = second_matrix.toarray()
-            return self._assist_dense(second_matrix, rows=rows)
-        else:
-            raise ValueError(
-            f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
-
-    def get_projection(self, second_matrix=None, rows=True, method="cooccurrence"):
+    def get_projection(self, second_matrix=None, rows=True, method=None):
         """
         Compute projection matrix, given binary bipartite input.
 
@@ -939,6 +817,74 @@ class RelatednessMetrics(MatrixProcessorCA):
                 validated_values[cols, rows] = pvalues_matrix[rows, cols]
 
             return validated_relatedness, validated_values
+        
+    def get_bicm_projection_dense(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
+        """
+        Generate BICM samples and validate the network.
+        """
+        original_bipartite = self._processed_dense
+        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
+
+        myGraph = BipartiteGraph()
+        myGraph.set_biadjacency_matrix(self._processed_dense)
+        my_probability_matrix = myGraph.get_bicm_matrix()
+        pvalues_matrix = np.zeros_like(empirical_projection)
+
+        if method=="assist":
+            second_network = BipartiteGraph()
+            second_network.set_biadjacency_matrix(second_matrix)
+            other_probability_matrix = second_network.get_bicm_matrix()
+
+        for _ in trange(num_iterations):
+            if method=="assist":
+                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
+                # self._processed_dense = sample_bicm(my_probability_matrix)
+                second_sample = csr_matrix(sample_bicm(other_probability_matrix))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method).toarray()>=empirical_projection, 1,0))
+
+            else:
+                self._processed_dense = csr_matrix(sample_bicm(my_probability_matrix))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1,0))
+
+        pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
+        self._processed_dense = original_bipartite #reset class network
+        if method=="assist":
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm_dense(pvalues_matrix, alpha, method=validation_method)
+            validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
+            validated_values = np.zeros_like(pvalues_matrix)
+
+            # validated position: (i, j)
+            if len(positionvalidated) > 0:
+                rows, cols = zip(*positionvalidated)
+
+                # Imposta 1 su (i,j) e (j,i)
+                validated_relatedness[rows, cols] = 1
+                # validated_relatedness[cols, rows] = 1
+
+                # Copia i valori della proximity media anche su (j,i)
+                validated_values[rows, cols] = pvalues_matrix[rows, cols]
+                # validated_values[cols, rows] = pvalues_matrix[rows, cols]
+
+            return validated_relatedness, validated_values
+
+        else:
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, method=validation_method)
+            validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
+            validated_values = np.zeros_like(pvalues_matrix)
+
+            # validated position: (i, j)
+            if len(positionvalidated) > 0:
+                rows, cols = zip(*positionvalidated)
+
+                # Imposta 1 su (i,j) e (j,i)
+                validated_relatedness[rows, cols] = 1
+                validated_relatedness[cols, rows] = 1
+
+                # Copia i valori della proximity media anche su (j,i)
+                validated_values[rows, cols] = pvalues_matrix[rows, cols]
+                validated_values[cols, rows] = pvalues_matrix[rows, cols]
+
+            return validated_relatedness, validated_values
 
 ############################################
 #########      Static methods      #########
@@ -948,7 +894,7 @@ class RelatednessMetrics(MatrixProcessorCA):
     def generate_binary_matrix(rows=20, cols=20, probability=0.8):
         """Generate a random binary matrix.
         Useful for tests, not in the final product."""
-        return np.random.binomial(1, probability, size=(rows, cols))
+        return csr_matrix(np.random.binomial(1, probability, size=(rows, cols)))
 
     @staticmethod
     def mat_to_network(matrix, projection=None, row_names=None, col_names=None, node_names=None):

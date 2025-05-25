@@ -7,7 +7,7 @@ from tqdm import trange
 from typing import Union, List, Tuple, Any, Optional
 from pathlib import Path
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, lil_matrix
 
 # BICM library
 from bicm import BipartiteGraph
@@ -751,70 +751,79 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
 
-    def get_bicm_projection(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
+    def get_bicm_projection(self, alpha=5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
         """
-        Generate BICM samples and validate the network.
+        Generate BICM samples and validate the network using sparse matrices.
         """
-        original_bipartite = self._processed_dense
+        original_bipartite = self._processed.copy()
         empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
 
         myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self._processed_dense)
+        myGraph.set_biadjacency_matrix(self._processed)
         my_probability_matrix = myGraph.get_bicm_matrix()
-        pvalues_matrix = np.zeros_like(empirical_projection)
 
-        if method=="assist":
+        shape = empirical_projection.shape
+        pvalues_matrix = lil_matrix(shape)
+
+        if method == "assist":
             second_network = BipartiteGraph()
             second_network.set_biadjacency_matrix(second_matrix)
             other_probability_matrix = second_network.get_bicm_matrix()
 
-        for _ in trange(num_iterations):
-            if method=="assist":
-                self._processed_dense = sample_bicm(my_probability_matrix)
-                second_sample = sample_bicm(other_probability_matrix)
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method)>=empirical_projection, 1,0))
+            for _ in trange(num_iterations):
+                sample_0 = sample_bicm(my_probability_matrix)
+                self._processed = csr_matrix(sample_0)
+                sample_1 = csr_matrix(sample_bicm(other_probability_matrix))
+                proj = self.get_projection(second_matrix=sample_1, rows=rows, method=method)
+                # confronta solo le entry non nulle della proiezione sparsa
+                proj = proj.tocoo()
+                for i, j, val in zip(proj.row, proj.col, proj.data):
+                    if val >= empirical_projection[i, j]:
+                        pvalues_matrix[i, j] += 1
 
-            else:
-                self._processed_dense = sample_bicm(my_probability_matrix)
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_matrix, rows=rows, method=method)>=empirical_projection, 1,0))
+        else:
+            for _ in trange(num_iterations):
+                sample_0 = sample_bicm(my_probability_matrix)
+                self._processed = csr_matrix(sample_0)
+                proj = self.get_projection(rows=rows, method=method)
 
-        pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
-        self._processed_dense = original_bipartite #reset class network
-        if method=="assist":
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm(pvalues_matrix, alpha, method=validation_method)
+                # confronta solo le entry non nulle della proiezione sparsa
+                proj = proj.tocoo()
+                for i, j, val in zip(proj.row, proj.col, proj.data):
+                    if val >= empirical_projection[i, j]:
+                        pvalues_matrix[i, j] += 1
+
+        # dopo il ciclo, normalizza
+        pvalues_matrix = pvalues_matrix.tocsr()
+        pvalues_matrix = pvalues_matrix.multiply(1.0 / num_iterations)
+
+        self._processed = original_bipartite  # reset class network
+        pvalues_matrix = pvalues_matrix.todense()  # convert to dense for validation
+        # pvalues_matrix = pvalues_matrix.tocsr()  # convert to sparse for validation
+
+        if method == "assist":
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm_dense(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
-            # validated position: (i, j)
             if len(positionvalidated) > 0:
-                rows, cols = zip(*positionvalidated)
-
-                # Imposta 1 su (i,j) e (j,i)
-                validated_relatedness[rows, cols] = 1
-                # validated_relatedness[cols, rows] = 1
-
-                # Copia i valori della proximity media anche su (j,i)
-                validated_values[rows, cols] = pvalues_matrix[rows, cols]
-                # validated_values[cols, rows] = pvalues_matrix[rows, cols]
+                rows_idx, cols_idx = zip(*positionvalidated)
+                validated_relatedness[rows_idx, cols_idx] = 1
+                validated_values[rows_idx, cols_idx] = pvalues_matrix[rows_idx, cols_idx]
 
             return validated_relatedness, validated_values
 
         else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, method=validation_method)
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_dense(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
-            # validated position: (i, j)
             if len(positionvalidated) > 0:
-                rows, cols = zip(*positionvalidated)
-
-                # Imposta 1 su (i,j) e (j,i)
-                validated_relatedness[rows, cols] = 1
-                validated_relatedness[cols, rows] = 1
-
-                # Copia i valori della proximity media anche su (j,i)
-                validated_values[rows, cols] = pvalues_matrix[rows, cols]
-                validated_values[cols, rows] = pvalues_matrix[rows, cols]
+                rows_idx, cols_idx = zip(*positionvalidated)
+                validated_relatedness[rows_idx, cols_idx] = 1
+                validated_relatedness[cols_idx, rows_idx] = 1
+                validated_values[rows_idx, cols_idx] = pvalues_matrix[rows_idx, cols_idx]
+                validated_values[cols_idx, rows_idx] = pvalues_matrix[rows_idx, cols_idx]
 
             return validated_relatedness, validated_values
         

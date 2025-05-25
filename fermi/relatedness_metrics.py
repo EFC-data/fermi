@@ -869,7 +869,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             return validated_relatedness, validated_values
 
         else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, method=validation_method)
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_dense(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 

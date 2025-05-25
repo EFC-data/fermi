@@ -848,6 +848,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
         self._processed_dense = original_bipartite #reset class network
+        self._processed = csr_matrix(original_bipartite) #reset class network
         if method=="assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm_dense(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)

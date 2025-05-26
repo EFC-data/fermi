@@ -910,7 +910,7 @@ class efc(MatrixProcessorCA):
               Scalar NODF value.
         """
         if self.nodf is None or force:
-            self.nodf = _nodf(self._processed)
+            self.nodf = self._NODF(self._processed)
         return self.nodf
 
     def plot_matrix(self,

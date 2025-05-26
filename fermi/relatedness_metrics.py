@@ -775,11 +775,10 @@ class RelatednessMetrics(MatrixProcessorCA):
                 self._processed = csr_matrix(sample_0)
                 sample_1 = csr_matrix(sample_bicm(other_probability_matrix))
                 proj = self.get_projection(second_matrix=sample_1, rows=rows, method=method)
-                # confronta solo le entry non nulle della proiezione sparsa
+
                 proj = proj.tocoo()
-                for i, j, val in zip(proj.row, proj.col, proj.data):
-                    if val >= empirical_projection[i, j]:
-                        pvalues_matrix[i, j] += 1
+                mask = proj.data >= empirical_projection[proj.row, proj.col]
+                pvalues_matrix[proj.row[mask], proj.col[mask]] += 1
 
         else:
             for _ in trange(num_iterations):
@@ -787,11 +786,9 @@ class RelatednessMetrics(MatrixProcessorCA):
                 self._processed = csr_matrix(sample_0)
                 proj = self.get_projection(rows=rows, method=method)
 
-                # confronta solo le entry non nulle della proiezione sparsa
                 proj = proj.tocoo()
-                for i, j, val in zip(proj.row, proj.col, proj.data):
-                    if val >= empirical_projection[i, j]:
-                        pvalues_matrix[i, j] += 1
+                mask = proj.data >= empirical_projection[proj.row, proj.col]
+                pvalues_matrix[proj.row[mask], proj.col[mask]] += 1
 
         # dopo il ciclo, normalizza
         pvalues_matrix = pvalues_matrix.tocsr()

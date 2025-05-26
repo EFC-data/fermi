@@ -771,24 +771,14 @@ class RelatednessMetrics(MatrixProcessorCA):
             other_probability_matrix = second_network.get_bicm_matrix()
 
             for _ in trange(num_iterations):
-                sample_0 = sample_bicm(my_probability_matrix)
-                self._processed = csr_matrix(sample_0)
-                sample_1 = csr_matrix(sample_bicm(other_probability_matrix))
-                proj = self.get_projection(second_matrix=sample_1, rows=rows, method=method)
-
-                proj = proj.tocoo()
-                mask = proj.data >= empirical_projection[proj.row, proj.col]
-                pvalues_matrix[proj.row[mask], proj.col[mask]] += 1
+                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
+                second_sample = csr_matrix(sample_bicm(other_probability_matrix))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method).toarray()>=empirical_projection, 1,0))
 
         else:
             for _ in trange(num_iterations):
-                sample_0 = sample_bicm(my_probability_matrix)
-                self._processed = csr_matrix(sample_0)
-                proj = self.get_projection(rows=rows, method=method)
-
-                proj = proj.tocoo()
-                mask = proj.data >= empirical_projection[proj.row, proj.col]
-                pvalues_matrix[proj.row[mask], proj.col[mask]] += 1
+                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1,0))
 
         # dopo il ciclo, normalizza
         pvalues_matrix = pvalues_matrix.tocsr()
@@ -823,7 +813,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 validated_values[cols_idx, rows_idx] = pvalues_matrix[rows_idx, cols_idx]
 
             return validated_relatedness, validated_values
-        
+
     def get_bicm_projection_dense(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
         """
         Generate BICM samples and validate the network.

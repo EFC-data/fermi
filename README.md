@@ -99,8 +99,8 @@ The module to generate cooccurrences and similar relatedness measures is
 
 The cooccurrence can be evaluated using
 
-    relatedness = myproj.get_projection()
-    validated_relatedness, validated_values = myproj.get_bicm_projection()
+    relatedness = myproj.get_projection(projection_method="cooccurrence")
+    validated_relatedness, validated_values = myproj.get_bicm_projection(projection_method="cooccurrence", validation_method="fdr")
 
 See a more detailed description in the API in the documentation.
 

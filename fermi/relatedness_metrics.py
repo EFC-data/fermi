@@ -421,7 +421,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 ########    Projection wrappers    #########
 ############################################
 
-    def get_projection(self, second_matrix=None, rows=True, method=None):
+    def get_projection(self, second_matrix=None, rows=True, projection_method=None):
         """
         Compute projection matrix, given binary bipartite input.
 
@@ -434,16 +434,16 @@ class RelatednessMetrics(MatrixProcessorCA):
             numpy.ndarray: The projection matrix representing relationships between matrices
         """
 
-        if method == "cooccurrence":
+        if projection_method == "cooccurrence":
             return self._cooccurrence(rows=rows)
 
-        elif method == "proximity":
+        elif projection_method == "proximity":
             return self._proximity(rows=rows)
 
-        elif method == "taxonomy":
+        elif projection_method == "taxonomy":
             return self._taxonomy(rows=rows)
 
-        elif method == "assist":
+        elif projection_method == "assist":
             if second_matrix is None:
                 raise ValueError("Second matrix is required for assist method.")
             if not sp.issparse(second_matrix):
@@ -452,9 +452,9 @@ class RelatednessMetrics(MatrixProcessorCA):
         
         else:
             raise ValueError(
-            f"Unsupported method {method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
+            f"Unsupported method {projection_method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
 
-    def get_bicm_projection(self, alpha=5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
+    def get_bicm_projection(self, alpha=5e-2, num_iterations=int(1e4), projection_method=None, rows=True, second_matrix=None, validation_method=None):
         """
         Generate BICM samples and validate the network using sparse matrices.
         """
@@ -462,14 +462,14 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
         elif validation_method not in ["bonferroni", "fdr", "direct"]:
             raise ValueError("Unsupported validation method {method}. Choose from: bonferroni, fdr, direct.")
-        if method is None:
+        if projection_method is None:
             raise ValueError("Projection method must be specified. Choose from: cooccurrence, proximity, taxonomy, assist.")
-        elif method not in ["cooccurrence", "proximity", "taxonomy", "assist"]:
+        elif projection_method not in ["cooccurrence", "proximity", "taxonomy", "assist"]:
             raise ValueError(
-            f"Unsupported projection method {method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
+            f"Unsupported projection method {projection_method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
         
         original_bipartite = self._processed.copy()
-        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
+        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, projection_method=projection_method)
 
         myGraph = BipartiteGraph()
         myGraph.set_biadjacency_matrix(self._processed)
@@ -478,7 +478,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         shape = empirical_projection.shape
         pvalues_matrix = np.zeros(shape, dtype=float)
 
-        if method == "assist":
+        if projection_method == "assist":
             second_network = BipartiteGraph()
             second_network.set_biadjacency_matrix(second_matrix)
             other_probability_matrix = second_network.get_bicm_matrix()
@@ -486,19 +486,19 @@ class RelatednessMetrics(MatrixProcessorCA):
             for _ in trange(num_iterations):
                 self._processed = csr_matrix(sample_bicm(my_probability_matrix))
                 second_sample = csr_matrix(sample_bicm(other_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method).toarray()>=empirical_projection, 1,0))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, projection_method=projection_method).toarray()>=empirical_projection, 1,0))
 
         else:
             for _ in trange(num_iterations):
                 self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1, 0))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, projection_method=projection_method).toarray()>=empirical_projection, 1, 0))
 
         # after the iterations, we normalize the p-values matrix
         pvalues_matrix = pvalues_matrix / num_iterations
 
         self._processed = original_bipartite  # reset class network
 
-        if method == "assist":
+        if projection_method == "assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
@@ -511,7 +511,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             return validated_relatedness, validated_values
 
         else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, method=validation_method)
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 

@@ -209,20 +209,20 @@ class efc(MatrixProcessorCA):
                          verbose: bool = False) -> tuple:
         """
         Compute the Economic Complexity Index (ECI) and Product Complexity Index (PCI)
-        using either the 'reflections' method or the 'spectral' method.
+        using either the 'reflections' method or the 'eigenvalue' method.
 
         Parameters
         ----------
           - method : str
-              Either 'reflections' for iterative method or 'spectral' for eigenvector-based method
+              Either 'reflections' for iterative method or 'eigenvalue' for eigenvector-based method
           - norm : str
               Normalization to apply to ECI/PCI ('sum', 'mean', etc.).
           - max_iterations : int
               Number of iterations to run for reflections method.
           - eigv : bool
-              If True and using 'spectral', also return eigenvectors.
+              If True and using 'eigenvalue', also return eigenvectors.
           - verbose : bool
-              If True, print debugging info (only for 'spectral').
+              If True, print debugging info (only for 'eigenvalue').
 
         Returns
         -------
@@ -233,10 +233,10 @@ class efc(MatrixProcessorCA):
             raise TypeError("matrix must be CSR for ECI/PCI computation")
         if method == 'reflections':
             return self._method_of_reflections(matrix, norm, max_iterations)
-        elif method == 'spectral':
+        elif method == 'eigenvalue':
             return self._eci_pci_from_eigs(matrix, norm, eigv, verbose)
         else:
-            raise ValueError(f"Unsupported method '{method}' choose 'reflections' or 'spectral'")
+            raise ValueError(f"Unsupported method '{method}' choose 'reflections' or 'eigenvalue'")
 
     def _method_of_reflections(self, matrix, norm: str = 'zscore', max_iterations: int = 10) -> tuple:
         """
@@ -291,7 +291,7 @@ class efc(MatrixProcessorCA):
 
     def _eci_pci_from_eigs(self, matrix, norm: str = 'zscore', eigv: bool = False, verbose: bool = False) -> tuple:
         """
-        Compute ECI and PCI based on the spectral method introduced by Cristelli et al. (2013).
+        Compute ECI and PCI based on the eigenvalue method introduced by Cristelli et al. (2013).
 
         This method uses the second-largest eigenvectors of the country–country (Mcc)
         and product–product (Mpp) projection matrices derived from the normalized
@@ -322,12 +322,14 @@ class efc(MatrixProcessorCA):
 
         # Normalize Mcp by diversification (rows) to get Pcp
         div = diversification.astype(float)
-        inverse_div = diags(np.where(div != 0, 1.0 / div, 0.0))
+        with np.errstate(divide='ignore'):
+            inverse_div = diags(np.where(div != 0, 1.0 / div, 0.0))
         Pcp = inverse_div.dot(Mcp)  # shape: (n_countries, n_products)
 
         # Normalize Mcp by ubiquity (columns) to get Ppc
         ubi = ubiquity.astype(float)
-        inverse_ubi = diags(np.where(ubi != 0, 1.0 / ubi, 0.0))
+        with np.errstate(divide='ignore'):
+            inverse_ubi = diags(np.where(ubi != 0, 1.0 / ubi, 0.0))
         Mpc = Mcp.transpose()  # shape: (n_products, n_countries)
         Ppc = inverse_ubi.dot(Mpc)  # normalize rows = columns of Mcp
 
@@ -788,9 +790,9 @@ class efc(MatrixProcessorCA):
           - max_iterations : int
               Only for 'reflections'.
           - eigv : bool
-              Only for 'spectral': if True, also return eigenvectors.
+              Only for 'eigenvalue': if True, also return eigenvectors.
           - verbose : bool
-              Only for 'spectral': print debug info.
+              Only for 'eigenvalue': print debug info.
           - force : bool
               If True, recompute even if cached.
           - aspandas : bool
@@ -801,7 +803,7 @@ class efc(MatrixProcessorCA):
           - tuple: (eci, pci)
               Two arrays if eigv=False.
           - tuple: (eci, eci_eig, pci, pci_eig)
-              Four arrays if eigv=True and method='spectral'.
+              Four arrays if eigv=True and method='eigenvalue'.
         """
         # Recompute if needed
         if self.eci is None or self.pci is None or force:
@@ -813,7 +815,7 @@ class efc(MatrixProcessorCA):
                     norm=norm,
                     max_iterations=max_iterations
                 )
-            else:  # spectral
+            else:  # eigenvalue
                 if eigv:
                     self.eci, self.eci_eig, self.pci, self.pci_eig = self._eci_pci_indices(
                         self._processed,
@@ -838,7 +840,7 @@ class efc(MatrixProcessorCA):
             return eci_df, pci_df
 
         # Return numpy arrays (2 or 4)
-        if method == 'spectral' and eigv:
+        if method == 'eigenvalue' and eigv:
             return self.eci, self.eci_eig, self.pci, self.pci_eig
         else:
             return self.eci, self.pci
@@ -908,7 +910,7 @@ class efc(MatrixProcessorCA):
               Scalar NODF value.
         """
         if self.nodf is None or force:
-            self.nodf = _nodf(self._processed)
+            self.nodf = self._NODF(self._processed)
         return self.nodf
 
     def plot_matrix(self,

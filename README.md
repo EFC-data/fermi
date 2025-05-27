@@ -53,6 +53,7 @@ To install the `fermi` modules cloning the repository from GitHub, you can follo
 ```bash
 git clone https://github.com/EFC-data/fermi.git
 cd fermi
+pip install -e .
 pip install -r requirements.txt
 ```
 

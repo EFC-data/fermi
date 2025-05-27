@@ -106,7 +106,6 @@ class RelatednessMetrics(MatrixProcessorCA):
         cooc = A.dot(A.T).tocoo()
         ubiquity = np.array(A.sum(axis=1)).flatten()
 
-        # Calcola inverso del massimo tra ubiquity[i] e ubiquity[j]
         row = cooc.row
         col = cooc.col
         data = cooc.data
@@ -140,27 +139,27 @@ class RelatednessMetrics(MatrixProcessorCA):
         else:
             network = self._processed
 
-        # Step 1: diversificazione (normalizzazione righe)
+        # Step 1: diversification (rows norm)
         diversification = np.array(network.sum(axis=1)).flatten()
         with np.errstate(divide='ignore'):
             inv_div = np.where(diversification != 0, 1.0 / diversification, 0.0)
         div_diag = csr_matrix((inv_div, (np.arange(len(inv_div)), np.arange(len(inv_div)))), shape=(len(inv_div), len(inv_div)))
         m_div = div_diag.dot(network)
 
-        # Step 2: prodotto intermedio
+        # Step 2: intermediate product
         intermediate = network.T.dot(m_div)
 
-        # Step 3: normalizzazione per ubiquità – TUTTE LE COPPIE (i,j)
+        # Step 3: ubiquity normalization
         n = intermediate.shape[0]
         ubiquity = np.array(network.sum(axis=0)).flatten()
 
-        # Costruzione esplicita di matrice dei pesi 1 / max(ubiq_i, ubiq_j)
+        # explicit meshgrid to create row and column indices and compute maximum ubiquity
         row_idx, col_idx = np.meshgrid(np.arange(n), np.arange(n), indexing='ij')
         max_ubiq = np.maximum(ubiquity[row_idx], ubiquity[col_idx])
         with np.errstate(divide='ignore'):
             weights = np.where(max_ubiq != 0, 1.0 / max_ubiq, 0.0)
 
-        # Applichiamo la moltiplicazione elemento per elemento
+        # compute taxonomy matrix
         taxonomy_dense = intermediate.toarray() * weights
 
         return csr_matrix(taxonomy_dense)
@@ -186,7 +185,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         return result
 
-    def _bonferroni_threshold_dense(self, test_pvmat: np.ndarray, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
+    def _bonferroni_threshold(self, test_pvmat: np.ndarray, interval: float, simmetry: bool) -> Tuple[List[Tuple[int, int]], List[float], float]:
         """
         Calculates the Bonferroni threshold for a bipartite matrix of p-values and returns
         the positions and p-values that satisfy the condition:
@@ -211,173 +210,141 @@ class RelatednessMetrics(MatrixProcessorCA):
           - threshold : float
               Computed threshold value (interval / D).
         """
-        # Compute total number of tested hypotesis (D)
-        D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
-        #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
-        threshold = interval / D
+        if simmetry:
+            # Compute total number of tested hypotesis (D)
+            D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
+            #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
+            threshold = interval / D
 
-        positionvalidated = []
-        pvvalidated = []
+            positionvalidated = []
+            pvvalidated = []
 
-        # Iterate on the whole matrix and select the positions with p-values less than threshold
-        for i in range(test_pvmat.shape[0]):
-            #for j in range(test_pvmat.shape[1]): #rectangular bipartite
-            for j in range(i + 1, test_pvmat.shape[0]): #validated projection
-                if test_pvmat[i, j] < threshold:
-                    positionvalidated.append((i, j))
-                    pvvalidated.append(test_pvmat[i, j])
+            # Iterate on the whole matrix and select the positions with p-values less than threshold
+            for i in range(test_pvmat.shape[0]):
+                #for j in range(test_pvmat.shape[1]): #rectangular bipartite
+                for j in range(i + 1, test_pvmat.shape[0]): #validated projection
+                    if test_pvmat[i, j] < threshold:
+                        positionvalidated.append((i, j))
+                        pvvalidated.append(test_pvmat[i, j])
 
-        if not positionvalidated:
-            print("No value satisfies the condition.")
+            if not positionvalidated:
+                print("No value satisfies the condition.")
 
-        return positionvalidated, pvvalidated, threshold
+            return positionvalidated, pvvalidated, threshold
+        elif not simmetry:
+            D = test_pvmat.shape[0] * test_pvmat.shape[1]
+            threshold = interval / D
 
-    def _bonferroni_threshold(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int, int]], List[float], float]:
-        """
-        Calculates the Bonferroni threshold for a bipartite matrix of p-values and returns
-        the positions and p-values that satisfy the condition:
+            positionvalidated = []
+            pvvalidated = []
 
-        p_value < interval / D
+            for i in range(test_pvmat.shape[0]):
+                for j in range(test_pvmat.shape[1]):
+                    if test_pvmat[i, j] < threshold:
+                        positionvalidated.append((i, j))
+                        pvvalidated.append(test_pvmat[i, j])
 
-        where D is the total number of tested hypotheses (n * (n - 1) / 2 for symmetric case).
+            if not positionvalidated:
+                print("No value satisfies the condition.")
 
-        Parameters
-        ----------
-        - test_pvmat : csr_matrix
-            Square matrix of p-values (n x n).
-        - interval : float
-            Significance level alpha to be divided by the number of hypotheses.
+            return positionvalidated, pvvalidated, threshold
 
-        Returns
-        -------
-        - positionvalidated : list of tuple
-            List of (i, j) indices where p-value < interval/D.
-        - pvvalidated : list of float
-            List of p-values satisfying the threshold.
-        - threshold : float
-            Computed threshold value (interval / D).
-        """
-        n = test_pvmat.shape[0]
-        D = n * (n - 1) / 2  # symmetric case (no diagonal, no duplicates)
-        threshold = interval / D
+        else:
+            raise ValueError(
+            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
-        positionvalidated = []
-        pvvalidated = []
+    def _fdr_threshold(self, test_pvmat, interval, simmetry=True):
 
-        # Usando formato COO per iterare solo sugli elementi non zero
-        coo = test_pvmat.tocoo()
-        for i, j, v in zip(coo.row, coo.col, coo.data):
-            if i < j and v < threshold:
-                positionvalidated.append((i, j))
-                pvvalidated.append(v)
+        if simmetry:
+            D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
+            #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
+            sorted_indices = []
+            sortedpvaluesfdr = []
 
-        if not positionvalidated:
-            print("No value satisfies the condition.")
+            for i in range(test_pvmat.shape[0]):
+                for j in range(i + 1, test_pvmat.shape[0]): #rectangular bipartite
+                #for j in range(test_pvmat.shape[1]): #validated projection
+                    sortedpvaluesfdr.append(test_pvmat[i][j])
+                    sorted_indices.append((i, j))
 
-        return positionvalidated, pvvalidated, threshold
+            sorted_pairs = sorted(zip(sortedpvaluesfdr, sorted_indices))  # Joint ordering
+            sortedpvaluesfdr, sorted_indices = zip(*sorted_pairs)
 
-    def _fdr_threshold_dense(self, test_pvmat, interval):
-        D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
-        #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
-        sorted_indices = []
-        sortedpvaluesfdr = []
+            if len(sortedpvaluesfdr) == 0:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        for i in range(test_pvmat.shape[0]):
-            for j in range(i + 1, test_pvmat.shape[0]): #rectangular bipartite
-            #for j in range(test_pvmat.shape[1]): #validated projection
-                sortedpvaluesfdr.append(test_pvmat[i][j])
-                sorted_indices.append((i, j))
+            sortedpvaluesfdr = np.array(sortedpvaluesfdr)
+            thresholds = np.arange(1, len(sortedpvaluesfdr) + 1) * interval / D
+            valid_indices = np.where(sortedpvaluesfdr <= thresholds)[0]
 
-        sorted_pairs = sorted(zip(sortedpvaluesfdr, sorted_indices))  # Joint ordering
-        sortedpvaluesfdr, sorted_indices = zip(*sorted_pairs)
+            if len(valid_indices) == 0:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        if len(sortedpvaluesfdr) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
+            thresholdpos = valid_indices[-1]
+            threshold = (thresholdpos + 1) * interval / D
 
-        sortedpvaluesfdr = np.array(sortedpvaluesfdr)
-        thresholds = np.arange(1, len(sortedpvaluesfdr) + 1) * interval / D
-        valid_indices = np.where(sortedpvaluesfdr <= thresholds)[0]
+            positionvalidated = []
+            pvvalidated = []
 
-        if len(valid_indices) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
+            for i in range(len(sortedpvaluesfdr)):
+                if sortedpvaluesfdr[i] <= threshold:
+                    positionvalidated.append(sorted_indices[i])
+                    pvvalidated.append(sortedpvaluesfdr[i])
+                else:
+                    break
 
-        thresholdpos = valid_indices[-1]
-        threshold = (thresholdpos + 1) * interval / D
+            if threshold is None:
+                threshold = 0
 
-        positionvalidated = []
-        pvvalidated = []
+            return positionvalidated, pvvalidated, threshold
+        elif not simmetry:
+            D = test_pvmat.shape[0] * test_pvmat.shape[1]
 
-        for i in range(len(sortedpvaluesfdr)):
-            if sortedpvaluesfdr[i] <= threshold:
-                positionvalidated.append(sorted_indices[i])
-                pvvalidated.append(sortedpvaluesfdr[i])
-            else:
-                break
+            sortedpvalues = []
+            sorted_indices = []
 
-        if threshold is None:
-            threshold = 0
+            for i in range(test_pvmat.shape[0]):
+                for j in range(test_pvmat.shape[1]):
+                    sortedpvalues.append(test_pvmat[i, j])
+                    sorted_indices.append((i, j))
 
-        return positionvalidated, pvvalidated, threshold
+            if not sortedpvalues:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-    def _fdr_threshold(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
-        """
-        Compute the FDR threshold for a bipartite matrix of p-values and return positions and values that satisfy the condition.
+            sorted_pairs = sorted(zip(sortedpvalues, sorted_indices))
+            sortedpvalues, sorted_indices = zip(*sorted_pairs)
+            sortedpvalues = np.array(sortedpvalues)
 
-        Parameters
-        ----------
-        - test_pvmat : csr_matrix
-            Square matrix of p-values.
-        - interval : float
-            Significance level alpha.
+            thresholds = np.arange(1, len(sortedpvalues) + 1) * interval / D
+            valid_indices = np.where(sortedpvalues <= thresholds)[0]
 
-        Returns
-        -------
-        - positionvalidated : list of tuple
-            List of (i, j) indices where p-values satisfy FDR threshold.
-        - pvvalidated : list of float
-            List of p-values passing the threshold.
-        - threshold : float or None
-            Computed threshold value or None if no values satisfy the condition.
-        """
-        n = test_pvmat.shape[0]
-        D = n * (n - 1) / 2  # symmetric case: no diagonal, no duplicates
+            if len(valid_indices) == 0:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        # Estrai tutti i valori nella metà superiore
-        coo = test_pvmat.tocoo()
-        filtered = [(v, (i,j)) for i,j,v in zip(coo.row, coo.col, coo.data) if i < j]
+            thresholdpos = valid_indices[-1]
+            threshold = (thresholdpos + 1) * interval / D
 
-        if not filtered:
-            print("No value satisfies the condition.")
-            return [], [], None
+            positionvalidated = []
+            pvvalidated = []
 
-        sortedpvaluesfdr, sorted_indices = zip(*sorted(filtered, key=lambda x: x[0]))
-        sortedpvaluesfdr = np.array(sortedpvaluesfdr)
+            for i in range(len(sortedpvalues)):
+                if sortedpvalues[i] <= threshold:
+                    positionvalidated.append(sorted_indices[i])
+                    pvvalidated.append(sortedpvalues[i])
+                else:
+                    break
 
-        thresholds = (np.arange(1, len(sortedpvaluesfdr) + 1) * interval) / D
-        valid_indices = np.where(sortedpvaluesfdr <= thresholds)[0]
+            return positionvalidated, pvvalidated, threshold
+        else:
+            raise ValueError(
+            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
-        if len(valid_indices) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
 
-        thresholdpos = valid_indices[-1]
-        threshold = (thresholdpos + 1) * interval / D
-
-        positionvalidated = []
-        pvvalidated = []
-
-        for i, pval in enumerate(sortedpvaluesfdr):
-            if pval <= threshold:
-                positionvalidated.append(sorted_indices[i])
-                pvvalidated.append(pval)
-            else:
-                break
-
-        return positionvalidated, pvvalidated, threshold
-
-    def _direct_threshold_dense(self, test_pvmat, alpha):
+    def _direct_threshold(self, test_pvmat, alpha=0.05, simmetry=None):
         """
         Select the positions in the p-value matrix that meet the threshold specified by alpha.
 
@@ -390,329 +357,65 @@ class RelatednessMetrics(MatrixProcessorCA):
             pvvalidated (list of float): Corresponding p-values.
             threshold (float): The alpha threshold used.
         """
-        sorted_indices = []
-        sortedpvalues = []
+        if simmetry:
+            sorted_indices = []
+            sortedpvalues = []
 
-        for i in range(test_pvmat.shape[0]):
-            for j in range(i + 1, test_pvmat.shape[0]):  # parte superiore della matrice, escludendo diagonale
-                sortedpvalues.append(test_pvmat[i][j])
-                sorted_indices.append((i, j))
+            for i in range(test_pvmat.shape[0]):
+                for j in range(i + 1, test_pvmat.shape[0]):  # parte superiore della matrice, escludendo diagonale
+                    sortedpvalues.append(test_pvmat[i][j])
+                    sorted_indices.append((i, j))
 
-        if len(sortedpvalues) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
+            if len(sortedpvalues) == 0:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        positionvalidated = []
-        pvvalidated = []
+            positionvalidated = []
+            pvvalidated = []
 
-        for pv, idx in zip(sortedpvalues, sorted_indices):
-            if pv <= alpha:
-                positionvalidated.append(idx)
-                pvvalidated.append(pv)
-
-        if len(pvvalidated) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        return positionvalidated, pvvalidated, alpha
-
-    def _direct_threshold(self, test_pvmat: csr_matrix, alpha: float) -> Tuple[List[Tuple[int, int]], List[float], Optional[float]]:
-        """
-        Select the positions in the p-value matrix that meet the threshold specified by alpha.
-
-        Args:
-            test_pvmat (csr_matrix): P-value sparse matrix.
-            alpha (float): Fixed threshold to apply.
-
-        Returns:
-            positionvalidated (list of tuple): Indices (i,j) of p-values satisfying p <= alpha.
-            pvvalidated (list of float): Corresponding p-values.
-            threshold (float or None): The alpha threshold used or None if no values satisfy.
-        """
-        coo = test_pvmat.tocoo()
-        positionvalidated = []
-        pvvalidated = []
-
-        # Consider only upper triangular (i < j)
-        for i, j, v in zip(coo.row, coo.col, coo.data):
-            if i < j and v <= alpha:
-                positionvalidated.append((i, j))
-                pvvalidated.append(v)
-
-        if not pvvalidated:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        return positionvalidated, pvvalidated, alpha
-
-    def _bonferroni_threshold_nonsymmetric_dense(self, test_pvmat, interval):
-        """
-        Bonferroni for non symmetrical matrix (es. bipartite): p_ij < alpha / D con D = n * m.
-        """
-        D = test_pvmat.shape[0] * test_pvmat.shape[1]
-        threshold = interval / D
-
-        positionvalidated = []
-        pvvalidated = []
-
-        for i in range(test_pvmat.shape[0]):
-            for j in range(test_pvmat.shape[1]):
-                if test_pvmat[i, j] < threshold:
-                    positionvalidated.append((i, j))
-                    pvvalidated.append(test_pvmat[i, j])
-
-        if not positionvalidated:
-            print("No value satisfies the condition.")
-
-        return positionvalidated, pvvalidated, threshold
-
-    def _bonferroni_threshold_nonsymmetric(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], float]:
-        """
-        Bonferroni correction for non-symmetric matrix (e.g. bipartite): 
-        selects positions where p_ij < alpha / D with D = n * m.
-
-        Parameters
-        ----------
-        - test_pvmat : csr_matrix
-            Rectangular sparse matrix of p-values.
-        - interval : float
-            Significance level alpha.
-
-        Returns
-        -------
-        - positionvalidated : list of tuple
-            List of (i,j) indices where p-value < threshold.
-        - pvvalidated : list of float
-            Corresponding p-values.
-        - threshold : float
-            Computed threshold (interval / D).
-        """
-        n, m = test_pvmat.shape
-        D = n * m
-        threshold = interval / D
-
-        positionvalidated = []
-        pvvalidated = []
-
-        coo = test_pvmat.tocoo()
-        for i, j, v in zip(coo.row, coo.col, coo.data):
-            if v < threshold:
-                positionvalidated.append((i, j))
-                pvvalidated.append(v)
-
-        if not positionvalidated:
-            print("No value satisfies the condition.")
-
-        return positionvalidated, pvvalidated, threshold
-
-    def _fdr_threshold_nonsymmetric_dense(self, test_pvmat, interval):
-        """
-        False Discovery Rate for non symmetrical matrix.
-        """
-        D = test_pvmat.shape[0] * test_pvmat.shape[1]
-
-        sortedpvalues = []
-        sorted_indices = []
-
-        for i in range(test_pvmat.shape[0]):
-            for j in range(test_pvmat.shape[1]):
-                sortedpvalues.append(test_pvmat[i, j])
-                sorted_indices.append((i, j))
-
-        if not sortedpvalues:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        sorted_pairs = sorted(zip(sortedpvalues, sorted_indices))
-        sortedpvalues, sorted_indices = zip(*sorted_pairs)
-        sortedpvalues = np.array(sortedpvalues)
-
-        thresholds = np.arange(1, len(sortedpvalues) + 1) * interval / D
-        valid_indices = np.where(sortedpvalues <= thresholds)[0]
-
-        if len(valid_indices) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        thresholdpos = valid_indices[-1]
-        threshold = (thresholdpos + 1) * interval / D
-
-        positionvalidated = []
-        pvvalidated = []
-
-        for i in range(len(sortedpvalues)):
-            if sortedpvalues[i] <= threshold:
-                positionvalidated.append(sorted_indices[i])
-                pvvalidated.append(sortedpvalues[i])
-            else:
-                break
-
-        return positionvalidated, pvvalidated, threshold
-
-    def _fdr_threshold_nonsymmetric(self, test_pvmat: csr_matrix, interval: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
-        """
-        False Discovery Rate for non-symmetrical matrix (e.g., bipartite).
-
-        Parameters
-        ----------
-        - test_pvmat : csr_matrix
-            Rectangular sparse matrix of p-values.
-        - interval : float
-            Significance level alpha.
-
-        Returns
-        -------
-        - positionvalidated : list of tuple
-            List of (i,j) indices passing the FDR threshold.
-        - pvvalidated : list of float
-            Corresponding p-values.
-        - threshold : float or None
-            Threshold value or None if none satisfies.
-        """
-        n, m = test_pvmat.shape
-        D = n * m
-
-        coo = test_pvmat.tocoo()
-        sortedpvalues = []
-        sorted_indices = []
-
-        # Consider all entries (including zeros if present; if zeros mean no test, consider only nonzeros)
-        for i, j, v in zip(coo.row, coo.col, coo.data):
-            sortedpvalues.append(v)
-            sorted_indices.append((i, j))
-
-        if not sortedpvalues:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        sorted_pairs = sorted(zip(sortedpvalues, sorted_indices))
-        sortedpvalues, sorted_indices = zip(*sorted_pairs)
-        sortedpvalues = np.array(sortedpvalues)
-
-        thresholds = np.arange(1, len(sortedpvalues) + 1) * interval / D
-        valid_indices = np.where(sortedpvalues <= thresholds)[0]
-
-        if len(valid_indices) == 0:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        thresholdpos = valid_indices[-1]
-        threshold = (thresholdpos + 1) * interval / D
-
-        positionvalidated = []
-        pvvalidated = []
-
-        for i in range(len(sortedpvalues)):
-            if sortedpvalues[i] <= threshold:
-                positionvalidated.append(sorted_indices[i])
-                pvvalidated.append(sortedpvalues[i])
-            else:
-                break
-
-        return positionvalidated, pvvalidated, threshold
-
-    def _direct_threshold_nonsymmetric_dense(self, test_pvmat, alpha):
-        """
-        Filtra p-value for non symmetrical matrix with fixed threshold.
-        """
-        positionvalidated = []
-        pvvalidated = []
-
-        for i in range(test_pvmat.shape[0]):
-            for j in range(test_pvmat.shape[1]):
-                pv = test_pvmat[i, j]
+            for pv, idx in zip(sortedpvalues, sorted_indices):
                 if pv <= alpha:
-                    positionvalidated.append((i, j))
+                    positionvalidated.append(idx)
                     pvvalidated.append(pv)
 
-        if not positionvalidated:
-            print("No value satisfies the condition.")
-            return [], [], None
+            if len(pvvalidated) == 0:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        return positionvalidated, pvvalidated, alpha
+            return positionvalidated, pvvalidated, alpha
+        elif not simmetry:
+        # Non-symmetric case: iterate through the entire matrix
+            positionvalidated = []
+            pvvalidated = []
 
-    def _direct_threshold_nonsymmetric(self, test_pvmat: csr_matrix, alpha: float) -> Tuple[List[Tuple[int,int]], List[float], Optional[float]]:
-        """
-        Filter p-values for non-symmetrical matrix with fixed threshold alpha.
+            for i in range(test_pvmat.shape[0]):
+                for j in range(test_pvmat.shape[1]):
+                    pv = test_pvmat[i, j]
+                    if pv <= alpha:
+                        positionvalidated.append((i, j))
+                        pvvalidated.append(pv)
 
-        Parameters
-        ----------
-        - test_pvmat : csr_matrix
-            Rectangular sparse matrix of p-values.
-        - alpha : float
-            Fixed threshold.
+            if not positionvalidated:
+                print("No value satisfies the condition.")
+                return [], [], None
 
-        Returns
-        -------
-        - positionvalidated : list of tuple
-            List of (i,j) indices with p-value <= alpha.
-        - pvvalidated : list of float
-            Corresponding p-values.
-        - alpha : float or None
-            Threshold used, or None if no values found.
-        """
-        positionvalidated = []
-        pvvalidated = []
+            return positionvalidated, pvvalidated, alpha
+        else:
+            raise ValueError(
+            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
-        coo = test_pvmat.tocoo()
-        for i, j, v in zip(coo.row, coo.col, coo.data):
-            if v <= alpha:
-                positionvalidated.append((i, j))
-                pvvalidated.append(v)
 
-        if not positionvalidated:
-            print("No value satisfies the condition.")
-            return [], [], None
-
-        return positionvalidated, pvvalidated, alpha
-
-    def _validation_threshold(self, test_pvmat, interval, method=None):
-        if method=="bonferroni":
-            return self._bonferroni_threshold(test_pvmat, interval)
-        elif method=="fdr":
-            return self._fdr_threshold(test_pvmat, interval)
-        elif method=="direct":
-            return self._direct_threshold(test_pvmat, interval)
+    def _validation_threshold(self, test_pvmat, interval, validation_method=None, symmetry=None):
+        if validation_method=="bonferroni":
+            return self._bonferroni_threshold(test_pvmat, interval, symmetry)
+        elif validation_method=="fdr":
+            return self._fdr_threshold(test_pvmat, interval, symmetry)
+        elif validation_method=="direct":
+            return self._direct_threshold(test_pvmat, interval, symmetry)
         #return positionvalidated, pvvalidated, threshold
         else:
             raise ValueError(
-            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
-
-    def _validation_threshold_dense(self, test_pvmat, interval, method=None):
-        if method=="bonferroni":
-            return self._bonferroni_threshold_dense(test_pvmat, interval)
-        elif method=="fdr":
-            return self._fdr_threshold_dense(test_pvmat, interval)
-        elif method=="direct":
-            return self._direct_threshold_dense(test_pvmat, interval)
-        #return positionvalidated, pvvalidated, threshold
-        else:
-            raise ValueError(
-            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
-
-    def _validation_threshold_non_symm(self, test_pvmat, interval, method=None):
-        if method=="bonferroni":
-            return self._bonferroni_threshold_nonsymmetric(test_pvmat, interval)
-        elif method=="fdr":
-            return self._fdr_threshold_nonsymmetric(test_pvmat, interval)
-        elif method=="direct":
-            return self._direct_threshold_nonsymmetric(test_pvmat, interval)
-        #return positionvalidated, pvvalidated, threshold
-        else:
-            raise ValueError(
-            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
-
-    def _validation_threshold_non_symm_dense(self, test_pvmat, interval, method=None):
-        if method=="bonferroni":
-            return self._bonferroni_threshold_nonsymmetric_dense(test_pvmat, interval)
-        elif method=="fdr":
-            return self._fdr_threshold_nonsymmetric_dense(test_pvmat, interval)
-        elif method=="direct":
-            return self._direct_threshold_nonsymmetric_dense(test_pvmat, interval)
-        #return positionvalidated, pvvalidated, threshold
-        else:
-            raise ValueError(
-            f"Unsupported method {method}. Please enter one of: bonferroni, fdr or direct.")
+            f"Unsupported method {validation_method}. Please enter one of: bonferroni, fdr or direct.")
 
 ############################################
 ########    Projection wrappers    #########
@@ -755,6 +458,16 @@ class RelatednessMetrics(MatrixProcessorCA):
         """
         Generate BICM samples and validate the network using sparse matrices.
         """
+        if validation_method is None:
+            raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
+        elif validation_method not in ["bonferroni", "fdr", "direct"]:
+            raise ValueError("Unsupported validation method {method}. Choose from: bonferroni, fdr, direct.")
+        if method is None:
+            raise ValueError("Projection method must be specified. Choose from: cooccurrence, proximity, taxonomy, assist.")
+        elif method not in ["cooccurrence", "proximity", "taxonomy", "assist"]:
+            raise ValueError(
+            f"Unsupported projection method {method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
+        
         original_bipartite = self._processed.copy()
         empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
 
@@ -778,18 +491,17 @@ class RelatednessMetrics(MatrixProcessorCA):
         else:
             for _ in trange(num_iterations):
                 self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1,0))
+                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1, 0))
 
-        # dopo il ciclo, normalizza
+        # after the iterations, we normalize the p-values matrix
         pvalues_matrix = pvalues_matrix.tocsr()
         pvalues_matrix = pvalues_matrix.multiply(1.0 / num_iterations)
 
         self._processed = original_bipartite  # reset class network
         pvalues_matrix = pvalues_matrix.todense()  # convert to dense for validation
-        # pvalues_matrix = pvalues_matrix.tocsr()  # convert to sparse for validation
-
+        
         if method == "assist":
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm_dense(pvalues_matrix, alpha, method=validation_method)
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
@@ -801,7 +513,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             return validated_relatedness, validated_values
 
         else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_dense(pvalues_matrix, alpha, method=validation_method)
+            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
@@ -814,93 +526,22 @@ class RelatednessMetrics(MatrixProcessorCA):
 
             return validated_relatedness, validated_values
 
-    def get_bicm_projection_dense(self, alpha = 5e-2, num_iterations=int(1e4), method=None, rows=True, second_matrix=None, validation_method=None):
-        """
-        Generate BICM samples and validate the network.
-        """
-        original_bipartite = self._processed_dense
-        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, method=method)
-
-        myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self._processed_dense)
-        my_probability_matrix = myGraph.get_bicm_matrix()
-        pvalues_matrix = np.zeros_like(empirical_projection)
-
-        if method=="assist":
-            second_network = BipartiteGraph()
-            second_network.set_biadjacency_matrix(second_matrix)
-            other_probability_matrix = second_network.get_bicm_matrix()
-
-        for _ in trange(num_iterations):
-            if method=="assist":
-                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                # self._processed_dense = sample_bicm(my_probability_matrix)
-                second_sample = csr_matrix(sample_bicm(other_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, method=method).toarray()>=empirical_projection, 1,0))
-
-            else:
-                # self._processed_dense = csr_matrix(sample_bicm(my_probability_matrix))
-                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1,0))
-
-        pvalues_matrix = np.divide(pvalues_matrix, num_iterations)
-        self._processed_dense = original_bipartite #reset class network
-        self._processed = csr_matrix(original_bipartite) #reset class network
-        if method=="assist":
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_non_symm_dense(pvalues_matrix, alpha, method=validation_method)
-            validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
-            validated_values = np.zeros_like(pvalues_matrix)
-
-            # validated position: (i, j)
-            if len(positionvalidated) > 0:
-                rows, cols = zip(*positionvalidated)
-
-                # Imposta 1 su (i,j) e (j,i)
-                validated_relatedness[rows, cols] = 1
-                # validated_relatedness[cols, rows] = 1
-
-                # Copia i valori della proximity media anche su (j,i)
-                validated_values[rows, cols] = pvalues_matrix[rows, cols]
-                # validated_values[cols, rows] = pvalues_matrix[rows, cols]
-
-            return validated_relatedness, validated_values
-
-        else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold_dense(pvalues_matrix, alpha, method=validation_method)
-            validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
-            validated_values = np.zeros_like(pvalues_matrix)
-
-            # validated position: (i, j)
-            if len(positionvalidated) > 0:
-                rows, cols = zip(*positionvalidated)
-
-                # Imposta 1 su (i,j) e (j,i)
-                validated_relatedness[rows, cols] = 1
-                validated_relatedness[cols, rows] = 1
-
-                # Copia i valori della proximity media anche su (j,i)
-                validated_values[rows, cols] = pvalues_matrix[rows, cols]
-                validated_values[cols, rows] = pvalues_matrix[rows, cols]
-
-            return validated_relatedness, validated_values
-
 ############################################
 #########      Static methods      #########
 ############################################
 
     @staticmethod
-    def generate_binary_matrix(rows=20, cols=20, probability=0.8):
-        """Generate a random binary matrix.
-        Useful for tests, not in the final product."""
-        return csr_matrix(np.random.binomial(1, probability, size=(rows, cols)))
-
-    @staticmethod
     def mat_to_network(matrix, projection=None, row_names=None, col_names=None, node_names=None):
 
+        #Control if matrix is a valid bipartite matrix in np ndarray format
+        if not isinstance(matrix, (np.ndarray, sp.spmatrix)):
+            raise ValueError("Input matrix must be a numpy ndarray or a scipy sparse matrix.")
+        if isinstance(matrix, sp.spmatrix):
+            matrix = matrix.toarray()
         if projection:
             # Check simmetry
-            # if not np.allclose(matrix, matrix.T):
-            #     raise ValueError("Matrix is not simmetric: not a valid bipartite projection.")
+            if not np.allclose(matrix, matrix.T):
+                raise ValueError("Matrix is not simmetric: not a valid bipartite projection.")
 
             G = nx.Graph()
 
@@ -959,7 +600,9 @@ class RelatednessMetrics(MatrixProcessorCA):
         Parameters:
 
         '''
-
+        # control if G is a valid graph
+        if not isinstance(G, nx.Graph):
+            raise ValueError("Input G must be a NetworkX Graph object. Please convert your matrix to a graph using mat_to_network() method.")
         if layout:
             layout_pos = getattr(nx, f"{layout}_layout")(G)
         else:

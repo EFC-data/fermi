@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import csr_matrix, hstack, vstack
 from tqdm import tqdm
-from typing import Union
+from typing import Union, List, Tuple
 
 class ECPredictor:
     """

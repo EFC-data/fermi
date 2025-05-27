@@ -89,8 +89,9 @@ class MatrixProcessorCA:
         Compute Revealed Comparative Advantage (RCA) and replace processed matrix.
 
         The RCA is defined as:
-            RCA_{i,j} = (X_{i,j} / X_{i,·}) * (X_{i,j} / X_{·,j}) * sqrt(X_{·,·})
-
+            RCA_{i,j} = (X_{i,j} / X_{i,·}) / (X_{·,j} / X_{·,·})
+            where j is the column, i is the row.
+            
         Returns
         -------
         MatrixProcessorCA

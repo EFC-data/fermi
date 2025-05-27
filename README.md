@@ -9,7 +9,7 @@ The **F**itn**E**ss, The **R**elatedness and The other **M**etr**I**cs
 
 ---
 
-FERMI is a modular Python framework for analyzing the main Economic Complexity metrics and features.
+`fermi` is a modular Python framework for analyzing the main Economic Complexity metrics and features.
 It provides tools to explore the hidden structure of economies through:
 
 - 📊 **Matrix preprocessing**: raw cleaning, sparse conversion, Comparative advantage RCA/ICA, transformation and thresholding.
@@ -20,7 +20,8 @@ It provides tools to explore the hidden structure of economies through:
 
 ---
 
-## 📦 Installation
+## 📦 Getting Started
+### Requirements
 > ⚠️ Requires Python ≥ 3.0
 To correnctly install and use the package, you need to have
 ```bash
@@ -35,20 +36,28 @@ tqdm
 networkx ≥ 2.6
 bicm ≥ 3.3.1
 ```
+///### Install the module 
 To install prerequisites in a virtual environment you can use the pip installation.
 /// This is commented
 ///```bash
 ///pip install fermi
 ///```
-To install the `fermi` modules downloading from GitHub, you can follow the code:
+
+### Clone the Repository (if necessary) 
+If you wan to create a virtual environment to avoid conflict with the installed version of the requirements, you can follow the code:
 ```bash
 python -m venv fermi-env
 source fermi-env/bin/activate
+```
+To install the `fermi` modules cloning the repository from GitHub, you can follow the code:
+```bash
 git clone https://github.com/EFC-data/fermi.git
 cd fermi
 pip install -r requirements.txt
 ```
-To use fermi on colab write instead:
+
+### Using colab
+To use fermi on colab cloning the repository, use the following code:
 ```bash
 !git clone https://github.com/EFC-data/fermi.git
 %cd fermi
@@ -57,14 +66,15 @@ To use fermi on colab write instead:
 
 ---
 
-## 📦 Basic functionalities
+## 🚀 Basic functionalities
+### Fitness and Complexity module
 The main module to generate an Economic Complexity object and initialize it (with a biadjacency matrix):
 
     import fermi
     myefc = fermi.efc()
     myefc.load(my_biadjacency_matrix, *possible kwargs*)
 
-To compute the Revealed COmparative Advantage (Balassa index) and binarize its value
+To compute the Revealed Comparative Advantage (Balassa index) and binarize its value
 
     myefc.compute_rca().binarize()
 
@@ -80,6 +90,7 @@ To compute the ECI index (using the eigenvalue method)
 
     eci, pci = myefc.get_eci_pci()
 
+### Relatedness module
 The module to generate cooccurrences and similar relatedness measures is
 
     myproj = fermi.RelatednessMetrics()
@@ -94,7 +105,7 @@ See a more detailed description in the API in the documentation.
 
 ---
 
-## 📦 How to cite
+## 🌐 How to cite
 If you use the `fermi` modules, please cite its location on Github
 [https://github.com/EFC-data/fermi](https://github.com/EFC-data/fermi)
 

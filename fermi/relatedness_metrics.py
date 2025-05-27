@@ -494,11 +494,9 @@ class RelatednessMetrics(MatrixProcessorCA):
                 pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, method=method).toarray()>=empirical_projection, 1, 0))
 
         # after the iterations, we normalize the p-values matrix
-        pvalues_matrix = pvalues_matrix.tocsr()
-        pvalues_matrix = pvalues_matrix.multiply(1.0 / num_iterations)
+        pvalues_matrix = pvalues_matrix / num_iterations
 
         self._processed = original_bipartite  # reset class network
-        pvalues_matrix = pvalues_matrix.todense()  # convert to dense for validation
 
         if method == "assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)

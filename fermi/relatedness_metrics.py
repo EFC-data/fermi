@@ -476,7 +476,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         my_probability_matrix = myGraph.get_bicm_matrix()
 
         shape = empirical_projection.shape
-        pvalues_matrix = lil_matrix(shape)
+        pvalues_matrix = np.zeros(shape, dtype=float)
 
         if method == "assist":
             second_network = BipartiteGraph()
@@ -499,7 +499,7 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         self._processed = original_bipartite  # reset class network
         pvalues_matrix = pvalues_matrix.todense()  # convert to dense for validation
-        
+
         if method == "assist":
             positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)

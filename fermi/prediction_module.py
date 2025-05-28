@@ -3,6 +3,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, hstack, vstack
 from tqdm import tqdm
 from typing import Union, List, Tuple
+from scipy.stats import norm
 
 class ECPredictor:
     """
@@ -424,12 +425,6 @@ class SPS:
         if delta is None:
             delta = self.delta_t
             
-        if (actor, year + delta) not in self.state_matrix.index:
-            raise ValueError(
-                f"Cannot predict for actor '{actor}': {year}+{delta} exceeds available years "
-                f"({self.years.min()}–{self.years.max()})."
-                )
-            
         dims = dims or self.dimensions
         x0, weights, delta_X = self._regression_core(actor, year, delta, dims)
         
@@ -487,12 +482,6 @@ class SPS:
         """
         if delta is None:
             delta = self.delta_t
-            
-        if (actor, year + delta) not in self.state_matrix.index:
-            raise ValueError(
-                f"Cannot predict for actor '{actor}': {year}+{delta} exceeds available years "
-                f"({self.years.min()}–{self.years.max()})."
-                )
 
         dims = dims or self.dimensions
         

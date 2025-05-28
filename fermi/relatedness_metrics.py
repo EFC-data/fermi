@@ -32,19 +32,35 @@ from fermi.matrix_processor import MatrixProcessorCA
 
 class RelatednessMetrics(MatrixProcessorCA):
     """
-    A class representing a bipartite network with statistical validation
-    and relatedness computation.
+    This class implements the main relatedness methods, with optional statistical 
+    validation, from a binary (typically sparse) matrix.
+
+    Main functionalities include:
+    - Relatedness metrics computation:
+        - Cooccurrence matrix
+        - Proximity network
+        - Taxonomy network
+        - Assist network (from a second bipartite matrix)
+    - Statistical validation of the projection matrices:
+        - Bonferroni correction
+        - False Discovery Rate (FDR)
+        - Direct thresholding
+    - BICM sampling for statistical validation of the projections
+    - Matrix visualization with customizable sorting for comparative analysis
+
+    The class supports sparse matrices, configurable initial conditions, and row/column labeling.
+
     """
     def __init__(self, matrix: Union[np.ndarray, sp.spmatrix] = None):
         """
-        Initialize the bipartite network with a given binary matrix.
+        Initializes the RelatednessMetrics class with a given binary matrix.
+        The matrix is loaded into the class, and the internal state is set up for further processing.
+        If the matrix is not provided, an empty instance is created.
 
         Parameters
         ----------
           - matrix : np.ndarray or scipy.sparse.spmatrix
               Input binary matrix (dense or sparse) representing the biadjacency matrix.
-          - hardcopy : bool, optional
-              Whether to create a copy of the input matrix (default is False).
         """
         super().__init__()
 
@@ -57,12 +73,11 @@ class RelatednessMetrics(MatrixProcessorCA):
             **kwargs
     ):
         super().load(input_data, **kwargs)
-        self._processed_dense = self._processed.toarray()
 
     
-########################################
-########## INTERNAL METHODS ############
-########################################
+    ########################################
+    ########## Internal Methods ############
+    ########################################
 
     def _cooccurrence(self, rows: bool = True) -> csr_matrix:
         """
@@ -103,6 +118,8 @@ class RelatednessMetrics(MatrixProcessorCA):
         else:
             A = self._processed.T
 
+        # Step 1: compute cooccurrence matrix
+        # Convert to COO format for efficient row/column access
         cooc = A.dot(A.T).tocoo()
         ubiquity = np.array(A.sum(axis=1)).flatten()
 
@@ -113,7 +130,8 @@ class RelatednessMetrics(MatrixProcessorCA):
         ubi_max = np.maximum(ubiquity[row], ubiquity[col])
         with np.errstate(divide='ignore'):
             weights = np.where(ubi_max != 0, 1.0 / ubi_max, 0.0)
-
+        # Step 2: compute proximity matrix by normalizing cooccurrence with ubiquity weights
+        # Convert to CSR format for efficient matrix operations
         proximity_data = data * weights
         proximity = csr_matrix((proximity_data, (row, col)), shape=cooc.shape)
 
@@ -165,27 +183,28 @@ class RelatednessMetrics(MatrixProcessorCA):
         return csr_matrix(taxonomy_dense)
 
     def _assist(self, second_matrix: csr_matrix, rows: bool = True) -> csr_matrix:
-        
+
         M = self._processed.T if rows else self._processed
         M_prime = second_matrix.T if rows else second_matrix
-
+        # Step 1: compute normalization factors
         d_prime = np.array(M_prime.sum(axis=1)).flatten()
         d_prime[d_prime == 0] = 1
 
+        # Step 2: compute the normalized second matrix
         D_inv = csr_matrix((1.0 / d_prime, (np.arange(len(d_prime)), np.arange(len(d_prime)))), shape=(len(d_prime), len(d_prime)))
         M_prime_norm = D_inv @ M_prime
 
         u = np.array(M.sum(axis=0)).flatten()
         u[u == 0] = 1
-
+        # Step 3: compute the inverse of the ubiquity matrix
         U_inv = csr_matrix((1.0 / u, (np.arange(len(u)), np.arange(len(u)))), shape=(len(u), len(u)))
-
+        # Step 4: compute the assist matrix
         result = M.T @ M_prime_norm
         result = U_inv @ result
 
         return result
 
-    def _bonferroni_threshold(self, test_pvmat: np.ndarray, interval: float, simmetry: bool) -> Tuple[List[Tuple[int, int]], List[float], float]:
+    def _bonferroni_threshold(self, test_pvmat: np.ndarray, interval: float = 0.05, symmetry: bool = None) -> Tuple[List[Tuple[int, int]], List[float], float]:
         """
         Calculates the Bonferroni threshold for a bipartite matrix of p-values and returns
         the positions and p-values that satisfy the condition:
@@ -197,10 +216,15 @@ class RelatednessMetrics(MatrixProcessorCA):
         Parameters
         ----------
           - test_pvmat : np.ndarray
-              Square matrix of p-values (n x n).
+              Square matrix of p-values (N x N).
           - interval : float
               Significance level alpha to be divided by the number of hypotheses.
-
+          - symmetry : bool
+            If True, the matrix is considered symmetric (e.g., projection matrix),
+            and only the upper triangle is considered for validation.
+            If False, the entire matrix is considered (e.g., bipartite matrix).
+            If None, the method will raise an error.
+            
         Returns
         -------
           - positionvalidated : list of tuple
@@ -210,7 +234,8 @@ class RelatednessMetrics(MatrixProcessorCA):
           - threshold : float
               Computed threshold value (interval / D).
         """
-        if simmetry:
+
+        if symmetry:
             # Compute total number of tested hypotesis (D)
             D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
             #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
@@ -231,7 +256,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 print("No value satisfies the condition.")
 
             return positionvalidated, pvvalidated, threshold
-        elif not simmetry:
+        elif not symmetry:
             D = test_pvmat.shape[0] * test_pvmat.shape[1]
             threshold = interval / D
 
@@ -251,11 +276,43 @@ class RelatednessMetrics(MatrixProcessorCA):
 
         else:
             raise ValueError(
-            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
+            f"Unsupported symmetry parameter {symmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
-    def _fdr_threshold(self, test_pvmat, interval, simmetry=True):
+    def _fdr_threshold(self, test_pvmat: np.ndarray, interval: float = 0.05, symmetry: bool = None) -> Tuple[List[Tuple[int, int]], List[float], float]:
 
-        if simmetry:
+        """
+        Calculates the False Rate Discovery (FDR) threshold for a bipartite matrix of p-values and returns
+        the positions and p-values that satisfy the condition:
+
+        p_value < alpha_{FDR} = k * interval / D
+
+        where D is the total number of tested hypotheses (n * m) and k is the highest index i that satisfies the relationship:
+
+        p_value_i < i * interval / D
+
+        Parameters
+        ----------
+          - test_pvmat : np.ndarray
+              Square matrix of p-values (N x N).
+          - interval : float
+              Significance level alpha to be divided by the number of hypotheses.
+          - symmetry : bool
+            If True, the matrix is considered symmetric (e.g., projection matrix),
+            and only the upper triangle is considered for validation.
+            If False, the entire matrix is considered (e.g., bipartite matrix).
+            If None, the method will raise an error.
+            
+        Returns
+        -------
+          - positionvalidated : list of tuple
+              List of (i, j) indices where p-value < interval/D.
+          - pvvalidated : list of float
+              List of p-values satisfying the threshold.
+          - threshold : float
+              Computed threshold value alpha_{FDR}.
+        """
+
+        if symmetry:
             D = test_pvmat.shape[0] * (test_pvmat.shape[0] - 1) / 2 #square matrix of pvalues/projection: does not consider diagonal and symmetrical terms
             #D = test_pvmat.shape[0] * test_pvmat.shape[1] #rectangular bipartite matrix: general case
             sorted_indices = []
@@ -299,7 +356,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 threshold = 0
 
             return positionvalidated, pvvalidated, threshold
-        elif not simmetry:
+        elif not symmetry:
             D = test_pvmat.shape[0] * test_pvmat.shape[1]
 
             sortedpvalues = []
@@ -341,10 +398,10 @@ class RelatednessMetrics(MatrixProcessorCA):
             return positionvalidated, pvvalidated, threshold
         else:
             raise ValueError(
-            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
+            f"Unsupported symmetry parameter {symmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
 
-    def _direct_threshold(self, test_pvmat, alpha=0.05, simmetry=None):
+    def _direct_threshold(self, test_pvmat: np.ndarray, alpha: float=0.05, symmetry: bool=None) -> Tuple[List[Tuple[int, int]], List[float], float]:
         """
         Select the positions in the p-value matrix that meet the threshold specified by alpha.
 
@@ -357,7 +414,7 @@ class RelatednessMetrics(MatrixProcessorCA):
             pvvalidated (list of float): Corresponding p-values.
             threshold (float): The alpha threshold used.
         """
-        if simmetry:
+        if symmetry:
             sorted_indices = []
             sortedpvalues = []
 
@@ -383,7 +440,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 return [], [], None
 
             return positionvalidated, pvvalidated, alpha
-        elif not simmetry:
+        elif not symmetry:
         # Non-symmetric case: iterate through the entire matrix
             positionvalidated = []
             pvvalidated = []
@@ -402,33 +459,62 @@ class RelatednessMetrics(MatrixProcessorCA):
             return positionvalidated, pvvalidated, alpha
         else:
             raise ValueError(
-            f"Unsupported symmetry parameter {simmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
+            f"Unsupported symmetry parameter {symmetry}. Please enter True for symmetric matrix or False for non-symmetric matrix.")
 
+    def _validation_threshold(self, test_pvmat: np.ndarray, interval: float = 0.05, validation_method: Optional[str] = None, symmetry: Optional[bool] = None) -> Tuple[List[Tuple[int, int]], List[float], float]:
 
-    def _validation_threshold(self, test_pvmat, interval, validation_method=None, symmetry=None):
+        """
+        Validate the p-value matrix using the specified validation method.
+        Parameters:
+            test_pvmat: np.ndarray
+                Matrix of p-values to validate.
+            interval: float
+                Significance level alpha to be divided by the number of hypotheses.
+            validation_method: str, optional
+                Method for validation, one of ['bonferroni', 'fdr', 'direct'].
+            symmetry: bool, optional
+                If True, the matrix is considered symmetric (e.g., projection matrix),
+                and only the upper triangle is considered for validation.
+                If False, the entire matrix is considered (e.g., bipartite matrix).
+                If None, the method will raise an error.
+        Returns:
+            positionvalidated: list of tuple
+                List of (i, j) indices where p-value satisfies the validation condition.
+            pvvalidated: list of float
+                List of p-values satisfying the validation condition.
+            threshold: float
+                Computed threshold value based on the validation method.
+        """
+        if validation_method is None:
+            raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
+        elif validation_method not in ["bonferroni", "fdr", "direct"]:
+            raise ValueError(f"Unsupported validation method {validation_method}. Choose from: bonferroni, fdr, direct.")
         if validation_method=="bonferroni":
             return self._bonferroni_threshold(test_pvmat, interval, symmetry)
         elif validation_method=="fdr":
             return self._fdr_threshold(test_pvmat, interval, symmetry)
         elif validation_method=="direct":
             return self._direct_threshold(test_pvmat, interval, symmetry)
-        #return positionvalidated, pvvalidated, threshold
-        else:
-            raise ValueError(
-            f"Unsupported method {validation_method}. Please enter one of: bonferroni, fdr or direct.")
 
-############################################
-########    Projection wrappers    #########
-############################################
+    ############################################
+    ########    Projection wrappers    #########
+    ############################################
 
-    def get_projection(self, second_matrix=None, rows=True, projection_method=None):
+    def get_projection(self, second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None, rows: bool = True, projection_method: Optional[str] = None) -> csr_matrix:
         """
         Compute projection matrix, given binary bipartite input.
+        The method supports different projection methods:
+        - "cooccurrence": Computes the cooccurrence matrix.
+        - "proximity": Computes the proximity network.
+        - "taxonomy": Computes the taxonomy network.
+        - "assist": Computes the assist network from a second binary matrix.
+        If the method is "assist", a second matrix must be provided.
+        If the method is not specified, it raises a ValueError.
 
         Parameters:
             second_matrix: Second binary matrix if method == "assist"
             rows: boolean, if True processes rows, if False processes columns
-            methods: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
+            projection_method: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
 
         Returns:
             numpy.ndarray: The projection matrix representing relationships between matrices
@@ -452,16 +538,41 @@ class RelatednessMetrics(MatrixProcessorCA):
         
         else:
             raise ValueError(
-            f"Unsupported method {projection_method}. Please enter one of: cooccurrence, proximity, taxonomy, assist.")
+            f"Unsupported method {projection_method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
 
-    def get_bicm_projection(self, alpha=5e-2, num_iterations=int(1e4), projection_method=None, rows=True, second_matrix=None, validation_method=None):
+    def get_bicm_projection(self, alpha: float = 0.05, num_iterations: int = 10000, projection_method: Optional[str] = None, rows: bool = True, second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None, validation_method: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generate BICM samples and validate the network using sparse matrices.
+        This method performs statistical validation of the projection matrix using BICM sampling.
+        It supports different validation methods:
+        - "bonferroni": Bonferroni correction for multiple comparisons.
+        - "fdr": False Discovery Rate (FDR) correction.
+        - "direct": Direct thresholding based on a fixed alpha value.
+        The method also supports different projection methods:
+        - "cooccurrence": Computes the cooccurrence matrix.
+        - "proximity": Computes the proximity network.
+        - "taxonomy": Computes the taxonomy network.
+        - "assist": Computes the assist network from a second binary matrix.
+            If the method is "assist", a second matrix must be provided.
+        Parameters:
+            alpha: float, significance level for validation
+            num_iterations: int, number of BICM samples to generate
+            projection_method: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
+            rows: boolean, if True processes rows, if False processes columns
+            second_matrix: Second binary matrix if method == "assist"
+            validation_method: string, ['bonferroni', 'fdr', 'direct']
+        Returns:
+            validated_relatedness: numpy.ndarray
+                Binary matrix indicating validated relationships (1 for validated, 0 otherwise).
+            validated_values: numpy.ndarray
+                Matrix of p-values corresponding to the validated relationships.
+        Raises:
+            ValueError: If the validation method or projection method is not specified or unsupported.
         """
         if validation_method is None:
             raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
         elif validation_method not in ["bonferroni", "fdr", "direct"]:
-            raise ValueError("Unsupported validation method {method}. Choose from: bonferroni, fdr, direct.")
+            raise ValueError(f"Unsupported validation method {validation_method}. Choose from: bonferroni, fdr, direct.")
         if projection_method is None:
             raise ValueError("Projection method must be specified. Choose from: cooccurrence, proximity, taxonomy, assist.")
         elif projection_method not in ["cooccurrence", "proximity", "taxonomy", "assist"]:
@@ -471,9 +582,9 @@ class RelatednessMetrics(MatrixProcessorCA):
         original_bipartite = self._processed.copy()
         empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, projection_method=projection_method)
 
-        myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self._processed)
-        my_probability_matrix = myGraph.get_bicm_matrix()
+        my_graph = BipartiteGraph()
+        my_graph.set_biadjacency_matrix(self._processed)
+        my_probability_matrix = my_graph.get_bicm_matrix()
 
         shape = empirical_projection.shape
         pvalues_matrix = np.zeros(shape, dtype=float)
@@ -524,12 +635,31 @@ class RelatednessMetrics(MatrixProcessorCA):
 
             return validated_relatedness, validated_values
 
-############################################
-#########      Static methods      #########
-############################################
+    ##############################################################
+    #########      Static methods for graph plotting     #########
+    ##############################################################
 
     @staticmethod
-    def mat_to_network(matrix, projection=None, row_names=None, col_names=None, node_names=None):
+    def mat_to_network(matrix: Union[np.ndarray, sp.spmatrix], projection: bool = None, row_names: Optional[List[str]] = None, col_names: Optional[List[str]] = None, node_names: Optional[List[str]] = None) -> nx.Graph:
+        """
+        Convert a bipartite matrix to a NetworkX graph.
+        Parameters:
+            matrix: np.ndarray or scipy.sparse.spmatrix
+                Input bipartite matrix (dense or sparse) representing the biadjacency matrix.
+            projection: bool, optional
+                If True, returns the bipartite projection graph.
+                If False, returns the bipartite graph.
+            row_names: list of str, optional
+                Names for the rows of the bipartite matrix.
+            col_names: list of str, optional
+                Names for the columns of the bipartite matrix.
+            node_names: list of str, optional
+                Names for the nodes in the bipartite projection graph.
+        Returns:
+            nx.Graph: A NetworkX graph representing the bipartite matrix.
+        Raises:
+            ValueError: If the input matrix is not a valid bipartite matrix or if the projection parameter is invalid.
+        """
 
         #Control if matrix is a valid bipartite matrix in np ndarray format
         if not isinstance(matrix, (np.ndarray, sp.spmatrix)):
@@ -537,9 +667,9 @@ class RelatednessMetrics(MatrixProcessorCA):
         if isinstance(matrix, sp.spmatrix):
             matrix = matrix.toarray()
         if projection:
-            # Check simmetry
+            # Check symmetry
             if not np.allclose(matrix, matrix.T):
-                raise ValueError("Matrix is not simmetric: not a valid bipartite projection.")
+                raise ValueError("Matrix is not symmetric: not a valid bipartite projection.")
 
             G = nx.Graph()
 
@@ -591,13 +721,35 @@ class RelatednessMetrics(MatrixProcessorCA):
             f"Unsupported projection parameter {projection}. projection=True if you intend to plot the projection, and projection=False otherwise.")
 
     @staticmethod
-    def plot_graph(G, node_size=5, weight=True, layout="", save=False,
-                interaction=False, filename="graph.html", color=None, names=False):
+    def plot_graph(G: nx.Graph, node_size: int = 5, weight: bool = True, layout: str = "", save: bool=False, 
+                   interaction: bool = False, filename: str="graph.html", color: Optional[dict] = None, names: bool = False) -> bokeh.plotting.figure:
 
-        '''
+        """
+        Plot a graph using NetworkX and Bokeh
+
         Parameters:
-
-        '''
+        - G : nx.Graph
+            Input graph to be plotted.
+            - node_size : int, optional
+                Size of the nodes in the graph. Default is 5.
+            - weight : bool, optional
+                If True, edge weights are considered in the visualization. Default is True.
+            - layout : str, optional
+                Layout algorithm to use for positioning nodes. Default is "" (no specific layout).
+            - save : bool, optional
+                If True, saves the plot as an HTML file. Default is False.
+            - interaction : bool, optional
+                If True, enables interaction features like hover and selection. Default is False.
+            - filename : str, optional
+                Name of the HTML file to save the plot if `save` is True. Default is "graph.html".
+            - color : dict, optional
+                Dictionary mapping node names to colors. Default is None (uses default colors).
+            - names : bool, optional
+                If True, displays node names on the graph. Default is False.
+        Returns:
+            - plot : bokeh.plotting.figure
+            Bokeh figure object containing the graph visualization.
+        """
         # control if G is a valid graph
         if not isinstance(G, nx.Graph):
             raise ValueError("Input G must be a NetworkX Graph object. Please convert your matrix to a graph using mat_to_network() method.")

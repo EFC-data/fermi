@@ -669,7 +669,11 @@ class RelatednessMetrics(MatrixProcessorCA):
         if projection:
             # Check symmetry
             if not np.allclose(matrix, matrix.T):
-                raise ValueError("Matrix is not symmetric: not a valid bipartite projection.")
+                symmetry = False
+            else:
+                symmetry = True
+                
+            # Create a NetworkX graph from the adjacency matrix
 
             G = nx.Graph()
 
@@ -681,12 +685,18 @@ class RelatednessMetrics(MatrixProcessorCA):
                 node_names = [f"Node_{i}" for i in range(len(matrix))]
 
             G.add_nodes_from(node_names)
-
-            for i in range(len(matrix)):
-                for j in range(i + 1, len(matrix)):
-                    weight = matrix[i, j]
-                    if weight != 0:
-                        G.add_edge(node_names[i], node_names[j], weight=weight)
+            if symmetry:
+                for i in range(len(matrix)):
+                    for j in range(i + 1, len(matrix)):
+                        weight = matrix[i, j]
+                        if weight != 0:
+                            G.add_edge(node_names[i], node_names[j], weight=weight)
+            elif not symmetry:
+                for i in range(len(matrix)):
+                    for j in range(len(matrix)):
+                        weight = matrix[i, j]
+                        if weight != 0:
+                            G.add_edge(node_names[i], node_names[j], weight=weight)
 
             return G
 

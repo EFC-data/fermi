@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>fermi documentation &#8212; fermi 0.1 documentation</title>
+    <title>Welcome to fermi’s documentation! &#8212; fermi 0.1 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
@@ -14,6 +14,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="api.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -31,13 +32,76 @@
 
           <div class="body" role="main">
             
-  <section id="fermi-documentation">
-<h1>fermi documentation<a class="headerlink" href="#fermi-documentation" title="Link to this heading">¶</a></h1>
-<p>Add your content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
-<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
-documentation for details.</p>
+  <section id="welcome-to-fermis-documentation">
+<h1>Welcome to fermi’s documentation!<a class="headerlink" href="#welcome-to-fermis-documentation" title="Link to this heading">¶</a></h1>
+<p><cite>fermi</cite> is a modular Python framework for analyzing the main Economic Complexity metrics and features.
+It provides tools to explore the hidden structure of economies through:</p>
+<ul class="simple">
+<li><p>📊 <strong>Matrix preprocessing</strong>: raw cleaning, sparse conversion, Comparative advantage RCA/ICA, transformation and thresholding.</p></li>
+<li><p>🧠 <strong>Fitness &amp; complexity</strong>: compute Fitness, Complexity ECI, PCI and other metrics via multiple methods.</p></li>
+<li><p>🌐 <strong>Relatedness metrics</strong>: product space, taxonomy, assist matrix.</p></li>
+<li><p>📈 <strong>Prediction models</strong>: GDP forecasting, density models, XGBoost.</p></li>
+<li><p>✅ <strong>Validation metrics</strong>: AUC, confusion matrix, prediction&#64;k.</p></li>
+</ul>
+</section>
+<section id="basic-functionalities-fitness-and-complexity-module">
+<h1>Basic functionalities: Fitness and Complexity module<a class="headerlink" href="#basic-functionalities-fitness-and-complexity-module" title="Link to this heading">¶</a></h1>
+<p>The main module to generate an Economic Complexity object and initialize it (with a biadjacency matrix):</p>
+<blockquote>
+<div><p>import fermi
+myefc = fermi.efc()
+myefc.load(my_biadjacency_matrix, <em>possible kwargs</em>)</p>
+</div></blockquote>
+<p>To compute the Revealed Comparative Advantage (Balassa index) and binarize its value</p>
+<blockquote>
+<div><p>myefc.compute_rca().binarize()</p>
+</div></blockquote>
+<p>To compute the Fitness and the Complexity (using the original [Tacchella2012] algorithm)</p>
+<blockquote>
+<div><p>fitness, complexity = myefc.get_fitness_complexity()</p>
+</div></blockquote>
+<p>To compute the diversification and the ubiquity</p>
+<blockquote>
+<div><p>div, ubi = myefc.get_diversification_ubiquity()</p>
+</div></blockquote>
+<p>To compute the ECI index (using the eigenvalue method)</p>
+<blockquote>
+<div><p>eci, pci = myefc.get_eci_pci()</p>
+</div></blockquote>
+</section>
+<section id="basic-functionalities-relatedness-module">
+<h1>Basic functionalities: Relatedness module<a class="headerlink" href="#basic-functionalities-relatedness-module" title="Link to this heading">¶</a></h1>
+<p>The module to generate cooccurrences and similar relatedness measures is</p>
+<blockquote>
+<div><p>myproj = fermi.RelatednessMetrics()
+myproj.load(my_biadjacency_matrix, <em>possible kwargs</em>)</p>
+</div></blockquote>
+<p>The cooccurrence can be evaluated using</p>
+<blockquote>
+<div><p>relatedness = myproj.get_projection(projection_method=”cooccurrence”)
+validated_relatedness, validated_values = myproj.get_bicm_projection(projection_method=”cooccurrence”, validation_method=”fdr”)</p>
+</div></blockquote>
 <div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#fermi.matrix_processor.MatrixProcessorCA"><code class="docutils literal notranslate"><span class="pre">MatrixProcessorCA</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#fermi.economic_fitness_complexity.efc"><code class="docutils literal notranslate"><span class="pre">efc</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#fermi.relatedness_metrics.RelatednessMetrics"><code class="docutils literal notranslate"><span class="pre">RelatednessMetrics</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#fermi.prediction_module.ECPredictor"><code class="docutils literal notranslate"><span class="pre">ECPredictor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#fermi.prediction_module.SPS"><code class="docutils literal notranslate"><span class="pre">SPS</span></code></a></li>
+</ul>
+</li>
+</ul>
 </div>
+</section>
+<section id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
 </section>
 
 
@@ -66,11 +130,16 @@ documentation for details.</p>
     </div>
 </search>
 <script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="api.html" title="next chapter">API Reference</a></li>
   </ul></li>
 </ul>
 </div>

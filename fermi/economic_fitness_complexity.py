@@ -704,7 +704,7 @@ class efc(MatrixProcessorCA):
               If True, forces recomputation of fitness and complexity even if cached.
           - aspandas : bool, default False
               If True, returns results as pandas DataFrames with appropriate labels.
-          - **kwargs : dict
+          - `**kwargs` : dict
               Additional keyword arguments passed to the internal _fitness_complexity() method.
 
         Returns
@@ -855,7 +855,7 @@ class efc(MatrixProcessorCA):
               If True, forces recomputation even if already cached.
           - aspandas : bool, default False
               If True, returns results as pandas DataFrames.
-          - **kwargs : dict
+          - `**kwargs` : dict
               Additional parameters forwarded to _eci_pci_indices().
 
         Returns

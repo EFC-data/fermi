@@ -32,25 +32,31 @@ from fermi.matrix_processor import MatrixProcessorCA
 
 class RelatednessMetrics(MatrixProcessorCA):
     """
-    This class implements the main relatedness methods, with optional statistical 
-    validation, from a binary (typically sparse) matrix.
+    Main relatedness methods for binary matrices, with optional statistical validation.
 
-    Main functionalities include:
-    - Relatedness metrics computation:
+    This class provides tools to compute and validate projection networks
+    derived from a binary (typically sparse) matrix.
+
+    Features
+    --------
+    Relatedness metrics
         - Cooccurrence matrix
         - Proximity network
         - Taxonomy network
         - Assist network (from a second bipartite matrix)
-    - Statistical validation of the projection matrices:
+
+    Statistical validation
         - Bonferroni correction
         - False Discovery Rate (FDR)
         - Direct thresholding
-    - BICM sampling for statistical validation of the projections
-    - Matrix visualization with customizable sorting for comparative analysis
 
-    The class supports sparse matrices, configurable initial conditions, and row/column labeling.
-
+    Additional functionality
+        - BICM sampling for statistical validation of projections
+        - Matrix visualization with customizable sorting
+        - Support for sparse matrices, configurable initial conditions,
+          and custom row/column labels
     """
+
     def __init__(self, matrix: Union[np.ndarray, sp.spmatrix] = None):
         """
         Initializes the RelatednessMetrics class with a given binary matrix.
@@ -502,22 +508,39 @@ class RelatednessMetrics(MatrixProcessorCA):
 
     def get_projection(self, second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None, rows: bool = True, projection_method: Optional[str] = None) -> csr_matrix:
         """
-        Compute projection matrix, given binary bipartite input.
-        The method supports different projection methods:
-        - "cooccurrence": Computes the cooccurrence matrix.
-        - "proximity": Computes the proximity network.
-        - "taxonomy": Computes the taxonomy network.
-        - "assist": Computes the assist network from a second binary matrix.
-        If the method is "assist", a second matrix must be provided.
-        If the method is not specified, it raises a ValueError.
+        Compute a one-mode projection from a binary bipartite matrix.
 
-        Parameters:
-            second_matrix: Second binary matrix if method == "assist"
-            rows: boolean, if True processes rows, if False processes columns
-            projection_method: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
+        Depending on the chosen method, returns different networks of relationships
+        either between rows or between columns of the input.
 
-        Returns:
-            numpy.ndarray: The projection matrix representing relationships between matrices
+        Parameters
+        ----------
+        second_matrix : csr_matrix or ndarray, optional
+            A second binary bipartite matrix required only if
+            `projection_method == "assist"`. Must have the same shape
+            (in the non-projected dimension) as the primary matrix.
+        rows : bool, default=True
+            If True, project onto the row-space (i.e., produce a row×row matrix);
+            if False, project onto the column-space (column×column matrix).
+        projection_method : {'cooccurrence', 'proximity', 'taxonomy', 'assist'}, default='cooccurrence'
+            The algorithm to use for projection:
+            - `'cooccurrence'` : raw cooccurrence counts.
+            - `'proximity'`    : normalized cooccurrence (e.g., phi-coefficient).
+            - `'taxonomy'`     : hierarchical or minimum-spanning projection.
+            - `'assist'`       : cross-assist network using `second_matrix`.
+
+        Returns
+        -------
+        projection : ndarray
+            A square matrix of shape (n, n) where n is the number of
+            rows if `rows=True` or number of columns if `rows=False`,
+            containing the computed projection values.
+
+        Raises
+        ------
+        ValueError
+            If `projection_method` is not one of the supported options
+            or if `second_matrix` is missing when required.
         """
 
         if projection_method == "cooccurrence":
@@ -542,32 +565,46 @@ class RelatednessMetrics(MatrixProcessorCA):
 
     def get_bicm_projection(self, alpha: float = 0.05, num_iterations: int = 10000, projection_method: Optional[str] = None, rows: bool = True, second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None, validation_method: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Generate BICM samples and validate the network using sparse matrices.
-        This method performs statistical validation of the projection matrix using BICM sampling.
-        It supports different validation methods:
-        - "bonferroni": Bonferroni correction for multiple comparisons.
-        - "fdr": False Discovery Rate (FDR) correction.
-        - "direct": Direct thresholding based on a fixed alpha value.
-        The method also supports different projection methods:
-        - "cooccurrence": Computes the cooccurrence matrix.
-        - "proximity": Computes the proximity network.
-        - "taxonomy": Computes the taxonomy network.
-        - "assist": Computes the assist network from a second binary matrix.
-            If the method is "assist", a second matrix must be provided.
-        Parameters:
-            alpha: float, significance level for validation
-            num_iterations: int, number of BICM samples to generate
-            projection_method: string, ['cooccurrence', 'proximity', 'taxonomy', 'assist']
-            rows: boolean, if True processes rows, if False processes columns
-            second_matrix: Second binary matrix if method == "assist"
-            validation_method: string, ['bonferroni', 'fdr', 'direct']
-        Returns:
-            validated_relatedness: numpy.ndarray
-                Binary matrix indicating validated relationships (1 for validated, 0 otherwise).
-            validated_values: numpy.ndarray
-                Matrix of p-values corresponding to the validated relationships.
-        Raises:
-            ValueError: If the validation method or projection method is not specified or unsupported.
+        Perform BICM sampling and statistically validate a projection network.
+
+        This method generates BICM samples to build a null distribution for
+        a chosen one-mode projection, then applies a multiple‐comparison
+        correction or threshold to identify significant links.
+
+        Parameters
+        ----------
+        alpha : float, default=0.05
+            Significance level for validation (p-value threshold).
+        num_iterations : int, default=10000
+            Number of BICM random samples to generate.
+        projection_method : {'cooccurrence', 'proximity', 'taxonomy', 'assist'}, optional
+            Projection algorithm to apply:
+            - 'cooccurrence' : raw cooccurrence counts.
+            - 'proximity'    : normalized cooccurrence.
+            - 'taxonomy'     : hierarchical projection.
+            - 'assist'       : assist network (requires `second_matrix`).
+        rows : bool, default=True
+            If True, project onto rows (row×row matrix); if False, onto columns.
+        second_matrix : ndarray or sparse matrix, optional
+            Secondary bipartite matrix for 'assist' projection.
+        validation_method : {'bonferroni', 'fdr', 'direct'}, optional
+            Statistical validation procedure:
+            - 'bonferroni' : Bonferroni correction.
+            - 'fdr'        : False Discovery Rate.
+            - 'direct'     : direct p-value threshold at `alpha`.
+
+        Returns
+        -------
+        validated_relatedness : ndarray
+            Binary matrix (0/1) indicating which links are significant.
+        p_values : ndarray
+            Matrix of p-values from the validation step.
+
+        Raises
+        ------
+        ValueError
+            If `projection_method` or `validation_method` is missing or unsupported,
+            or if `second_matrix` is required but not provided.
         """
         if validation_method is None:
             raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
@@ -642,23 +679,35 @@ class RelatednessMetrics(MatrixProcessorCA):
     @staticmethod
     def mat_to_network(matrix: Union[np.ndarray, sp.spmatrix], projection: bool = None, row_names: Optional[List[str]] = None, col_names: Optional[List[str]] = None, node_names: Optional[List[str]] = None) -> nx.Graph:
         """
-        Convert a bipartite matrix to a NetworkX graph.
-        Parameters:
-            matrix: np.ndarray or scipy.sparse.spmatrix
-                Input bipartite matrix (dense or sparse) representing the biadjacency matrix.
-            projection: bool, optional
-                If True, returns the bipartite projection graph.
-                If False, returns the bipartite graph.
-            row_names: list of str, optional
-                Names for the rows of the bipartite matrix.
-            col_names: list of str, optional
-                Names for the columns of the bipartite matrix.
-            node_names: list of str, optional
-                Names for the nodes in the bipartite projection graph.
-        Returns:
-            nx.Graph: A NetworkX graph representing the bipartite matrix.
-        Raises:
-            ValueError: If the input matrix is not a valid bipartite matrix or if the projection parameter is invalid.
+        Convert a bipartite or projected matrix into a NetworkX graph.
+
+        Parameters
+        ----------
+        matrix : ndarray or sparse matrix
+            The input matrix. If `projection` is False or None, this is
+            the biadjacency (bipartite) matrix. If True, this is a
+            one-mode projection matrix.
+        projection : bool, optional
+            Whether `matrix` is already a one-mode projection (`True`)
+            or a bipartite adjacency (`False` or None).
+        row_names : list of str, optional
+            Labels for rows (used as node names in bipartite graph).
+        col_names : list of str, optional
+            Labels for columns (used as node names in bipartite graph).
+        node_names : list of str, optional
+            Custom names for nodes in a projected graph; must match
+            the dimension of `matrix`.
+
+        Returns
+        -------
+        graph : networkx.Graph
+            A NetworkX graph representing either the bipartite structure
+            or the one-mode projection.
+
+        Raises
+        ------
+        ValueError
+            If `matrix` is not 2-D, or if labels/names lengths do not match.
         """
 
         #Control if matrix is a valid bipartite matrix in np ndarray format
@@ -735,30 +784,33 @@ class RelatednessMetrics(MatrixProcessorCA):
                    interaction: bool = False, filename: str="graph.html", color: Optional[dict] = None, names: bool = False) -> bokeh.plotting.figure:
 
         """
-        Plot a graph using NetworkX and Bokeh
+        Visualize a NetworkX graph using Bokeh.
 
-        Parameters:
-        - G : nx.Graph
-            Input graph to be plotted.
-            - node_size : int, optional
-                Size of the nodes in the graph. Default is 5.
-            - weight : bool, optional
-                If True, edge weights are considered in the visualization. Default is True.
-            - layout : str, optional
-                Layout algorithm to use for positioning nodes. Default is "" (no specific layout).
-            - save : bool, optional
-                If True, saves the plot as an HTML file. Default is False.
-            - interaction : bool, optional
-                If True, enables interaction features like hover and selection. Default is False.
-            - filename : str, optional
-                Name of the HTML file to save the plot if `save` is True. Default is "graph.html".
-            - color : dict, optional
-                Dictionary mapping node names to colors. Default is None (uses default colors).
-            - names : bool, optional
-                If True, displays node names on the graph. Default is False.
-        Returns:
-            - plot : bokeh.plotting.figure
-            Bokeh figure object containing the graph visualization.
+        Parameters
+        ----------
+        G : networkx.Graph
+            The graph to be plotted.
+        node_size : int, default=5
+            Radius of graph nodes in screen units.
+        weight : bool, default=True
+            If True, edge widths reflect edge weights.
+        layout : str, default=''
+            Name of layout algorithm: 'spring', 'circular', etc.
+        save : bool, default=False
+            If True, save the plot to `filename`.
+        interaction : bool, default=False
+            If True, enable hover, zoom, and selection tools.
+        filename : str, default='graph.html'
+            Output HTML filename when `save=True`.
+        color : dict, optional
+            Mapping from node identifier to a color specification.
+        names : bool, default=False
+            If True, display node labels on the plot.
+
+        Returns
+        -------
+        plot : bokeh.plotting.figure
+            A Bokeh figure object containing the rendered graph.
         """
         # control if G is a valid graph
         if not isinstance(G, nx.Graph):

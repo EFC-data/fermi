@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API Reference &#8212; fermi 0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=2709fde1"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Welcome to fermi’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-fermi.matrix_processor">
+<span id="api-reference"></span><h1>API Reference<a class="headerlink" href="#module-fermi.matrix_processor" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fermi.matrix_processor.</span></span><span class="sig-name descname"><span class="pre">MatrixProcessorCA</span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Combined processor for loading, aligning sparse matrices and computing comparative advantage (RCA, ICA).</p>
+<p>Stores original and processed matrices internally. All methods modify internal state.
+Call get_matrices() to retrieve the current processed matrices.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.binarize">
+<span class="sig-name descname"><span class="pre">binarize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><span class="pre">MatrixProcessorCA</span></a></span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.binarize" title="Link to this definition">¶</a></dt>
+<dd><p>Binarize the processed matrix in-place using a threshold.</p>
+<p>All entries &gt;= threshold become 1, others 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>threshold</strong> (<em>float</em><em>, </em><em>default=1</em>) – Cut-off value for binarization.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The instance itself, with <cite>_processed</cite> binarized.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.compute_ica">
+<span class="sig-name descname"><span class="pre">compute_ica</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><span class="pre">MatrixProcessorCA</span></a></span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.compute_ica" title="Link to this definition">¶</a></dt>
+<dd><p>Compute Inferred Comparative Advantage (ICA) and replace processed matrix.</p>
+<p>Uses the Bipartite Weighted Configuration Model from the bicm module to obtain expected values
+of the weighted network, used as expected value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The instance itself, with <cite>_processed</cite> updated to ICA matrix.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.compute_rca">
+<span class="sig-name descname"><span class="pre">compute_rca</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><span class="pre">MatrixProcessorCA</span></a></span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.compute_rca" title="Link to this definition">¶</a></dt>
+<dd><p>Compute Revealed Comparative Advantage (RCA) and replace processed matrix.</p>
+<dl class="simple">
+<dt>The RCA is defined as:</dt><dd><p>RCA_{i,j} = (X_{i,j} / X_{i,·}) / (X_{·,j} / X_{·,·})
+where j is the column, i is the row.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The instance itself, with <cite>_processed</cite> updated to RCA matrix.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.copy" title="Link to this definition">¶</a></dt>
+<dd><p>Create a deep copy of this processor, including matrices and labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A deep copy of this object.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.get_matrix">
+<span class="sig-name descname"><span class="pre">get_matrix</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.get_matrix" title="Link to this definition">¶</a></dt>
+<dd><p>Retrieve the current processed matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The processed sparse matrix.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>csr_matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.matrix_processor.MatrixProcessorCA.load">
+<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><span class="pre">MatrixProcessorCA</span></a></span></span><a class="headerlink" href="#fermi.matrix_processor.MatrixProcessorCA.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load input data as a sparse matrix, store original, and initialize processed copy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_data</strong> (<em>str</em><em> or </em><em>Path</em><em> or </em><em>DataFrame</em><em> or </em><em>ndarray</em><em> or </em><em>list</em>) – Path to file, DataFrame, numpy array, sparse matrix, or edge list.</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments for file readers (e.g. sep, header).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The instance itself, with <cite>_original</cite> and <cite>_processed</cite> set.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-fermi.economic_fitness_complexity">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fermi.economic_fitness_complexity.</span></span><span class="sig-name descname"><span class="pre">efc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><span class="pre">MatrixProcessorCA</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><code class="xref py py-class docutils literal notranslate"><span class="pre">MatrixProcessorCA</span></code></a></p>
+<p>This class implements the core methods for computing Fitness and Complexity metrics
+in economic complexity analysis from a binary (typically sparse) matrix.</p>
+<p>Main functionalities include:
+- Fitness and Complexity computation (Tacchella-2012, Servedio-2018)
+- Economic Complexity Index (ECI) and Product Complexity Index (PCI)
+- Degree-based metrics: Diversification (country degree) and Ubiquity (product degree)
+- Structural metrics: Density and NODF (nestedness)
+- Matrix visualization with customizable sorting for comparative analysis</p>
+<p>The class supports sparse matrices, configurable initial conditions, and row/column labeling.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.add_dummy">
+<span class="sig-name descname"><span class="pre">add_dummy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dummy_row</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dummy_col</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.economic_fitness_complexity.efc" title="fermi.economic_fitness_complexity.efc"><span class="pre">efc</span></a></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.add_dummy" title="Link to this definition">¶</a></dt>
+<dd><p>Adds a dummy country (row of 1s) and/or a dummy product (column of 1s) to the matrix.</p>
+<p>This operation sets a reference scale: the dummy country has maximum fitness,
+while the dummy product has minimum complexity. If inplace=False, returns a modified copy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dummy_row</strong> (<em>-</em>) – Whether to add a dummy country (row of 1s).</p></li>
+<li><p><strong>dummy_col</strong> (<em>-</em>) – Whether to add a dummy product (column of 1s).</p></li>
+<li><p><strong>inplace</strong> (<em>-</em>) – If True, modifies the object in-place. If False, returns a new copy.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Modified efc instance (self or a copy).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>efc</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_density">
+<span class="sig-name descname"><span class="pre">get_density</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_density" title="Link to this definition">¶</a></dt>
+<dd><p>Computes the density of the binary matrix.</p>
+<p>Density is defined as the ratio of non-zero entries (typically 1s)
+to the total number of elements in the matrix..</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scalar density value between 0 and 1.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>float</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_diversification_ubiquity">
+<span class="sig-name descname"><span class="pre">get_diversification_ubiquity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aspandas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_diversification_ubiquity" title="Link to this definition">¶</a></dt>
+<dd><p>Compute and optionally return diversification and ubiquity vectors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>force</strong> (<em>-</em>) – If True, forces recomputation even if already cached.</p></li>
+<li><p><strong>aspandas</strong> (<em>-</em>) – If True, returns results as pandas DataFrames.</p></li>
+<li><p><strong>**kwargs</strong> (<em>-</em>) – Additional parameters forwarded to _eci_pci_indices().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>diversification and ubiquity vectors as (np.ndarray, np.ndarray) or (pd.DataFrame, pd.DataFrame).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>tuple</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_eci_pci">
+<span class="sig-name descname"><span class="pre">get_eci_pci</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'eigenvalue'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'zscore'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iterations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">18</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eigv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aspandas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_eci_pci" title="Link to this definition">¶</a></dt>
+<dd><p>Compute ECI and PCI (and optionally their eigenvectors).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>method</strong> (<em>-</em>) – Choice of algorithm.</p></li>
+<li><p><strong>norm</strong> (<em>-</em>) – How to normalize the output vectors.</p></li>
+<li><p><strong>max_iterations</strong> (<em>-</em>) – Only for ‘reflections’.</p></li>
+<li><p><strong>eigv</strong> (<em>-</em>) – Only for ‘eigenvalue’: if True, also return eigenvectors.</p></li>
+<li><p><strong>verbose</strong> (<em>-</em>) – Only for ‘eigenvalue’: print debug info.</p></li>
+<li><p><strong>force</strong> (<em>-</em>) – If True, recompute even if cached.</p></li>
+<li><p><strong>aspandas</strong> (<em>-</em>) – If True, return pandas DataFrames instead of numpy arrays.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>- tuple</strong> (<em>(eci, pci)</em>) – Two arrays if eigv=False.</p></li>
+<li><p><strong>- tuple</strong> (<em>(eci, eci_eig, pci, pci_eig)</em>) – Four arrays if eigv=True and method=’eigenvalue’.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_exogenous_fitness">
+<span class="sig-name descname"><span class="pre">get_exogenous_fitness</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Q</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">csr_matrix</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">norm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'sum'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aspandas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Series</span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_exogenous_fitness" title="Link to this definition">¶</a></dt>
+<dd><p>Compute exogenous fitness of subnational units using externally provided product complexities.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>Q</strong> (<em>-</em>) – Complexity vector for products (1D array).</p></li>
+<li><p><strong>sp_matrix</strong> (<em>-</em>) – Sparse matrix mapping regions to products. If None, use self._processed.</p></li>
+<li><p><strong>norm</strong> (<em>-</em>) – Normalization method for fitness (‘sum’, ‘mean’, etc.).</p></li>
+<li><p><strong>s_labels</strong> (<em>-</em>) – List of region/state labels to use as index if aspandas=True.</p></li>
+<li><p><strong>aspandas</strong> (<em>-</em>) – If True, return result as pandas DataFrame.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Normalized exogenous fitness vector.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>np.ndarray or pd.DataFrame</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_fitness_complexity">
+<span class="sig-name descname"><span class="pre">get_fitness_complexity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aspandas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">DataFrame</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_fitness_complexity" title="Link to this definition">¶</a></dt>
+<dd><p>Compute and cache fitness and complexity vectors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>force</strong> (<em>-</em>) – If True, forces recomputation of fitness and complexity even if cached.</p></li>
+<li><p><strong>aspandas</strong> (<em>-</em>) – If True, returns results as pandas DataFrames with appropriate labels.</p></li>
+<li><p><strong>**kwargs</strong> (<em>-</em>) – Additional keyword arguments passed to the internal _fitness_complexity() method.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Fitness and complexity vectors, as arrays or DataFrames depending on aspandas</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>tuple of numpy.ndarray or tuple of pd.DataFrame</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.get_nodf">
+<span class="sig-name descname"><span class="pre">get_nodf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">force</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.get_nodf" title="Link to this definition">¶</a></dt>
+<dd><p>Computes the Nestedness metric (NODF) of the binary matrix.</p>
+<p>NODF is a measure of how nested the matrix is, indicating how well
+the presence of certain elements in rows and columns correlates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scalar NODF value.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>float</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.load">
+<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load input data as a sparse matrix, store original, and initialize processed copy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_data</strong> (<em>str</em><em> or </em><em>Path</em><em> or </em><em>DataFrame</em><em> or </em><em>ndarray</em><em> or </em><em>list</em>) – Path to file, DataFrame, numpy array, sparse matrix, or edge list.</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments for file readers (e.g. sep, header).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The instance itself, with <cite>_original</cite> and <cite>_processed</cite> set.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.normalize">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">normalize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Series</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalization</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'sum'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Series</span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.normalize" title="Link to this definition">¶</a></dt>
+<dd><p>Normalize a numeric vector or series using a a specified method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>vector</strong> (<em>-</em>) – The input array or series to normalize</p></li>
+<li><p><strong>normalization</strong> (<em>-</em>) – <dl class="simple">
+<dt>One of ‘sum’ (divide by sum), ‘max’ (divide by max),</dt><dd><p>’mean’ (divide by mean), or ‘zscore’ (standard score).</p>
+</dd>
+</dl>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The Normalized array or series of the same type.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>np.ndarray or pd.Series</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.economic_fitness_complexity.efc.plot_matrix">
+<span class="sig-name descname"><span class="pre">plot_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'fitness'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Blues'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_row_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Countries'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_col_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Products'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fontsize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_set0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_set1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vmax</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_nan</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Figure</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Axes</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.economic_fitness_complexity.efc.plot_matrix" title="Link to this definition">¶</a></dt>
+<dd><p>Visualizes the binary matrix using matplotlib’s <cite>matshow</cite>.
+Rows and columns are reordered based on a selected index (e.g., fitness, ECI, degree).
+Can optionally apply a custom row/column ordering and control colormap scaling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>index</strong> (<em>-</em>) – Sorting criterion: ‘fitness’, ‘eci’, ‘degree’, ‘custom’, ‘no’, etc.</p></li>
+<li><p><strong>cmap</strong> (<em>-</em>) – Colormap to use.</p></li>
+<li><p><strong>global_row_labels</strong> (<em>-</em>) – Label for row axis.</p></li>
+<li><p><strong>global_col_labels</strong> (<em>-</em>) – Label for column axis.</p></li>
+<li><p><strong>fontsize</strong> (<em>-</em>) – Font size for labels.</p></li>
+<li><p><strong>user_set0</strong> (<em>-</em>) – Custom order for rows.</p></li>
+<li><p><strong>user_set1</strong> (<em>-</em>) – Custom order for columns.</p></li>
+<li><p><strong>vmin</strong> (<em>-</em>) – Minimum value for color scale.</p></li>
+<li><p><strong>vmax</strong> (<em>-</em>) – Maximum value for color scale.</p></li>
+<li><p><strong>zero_nan</strong> (<em>-</em>) – If True, zero entries are shown as blank (NaN).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(fig, ax): Matplotlib figure and axis.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><ul class="simple">
+<li><p>tuple</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-fermi.relatedness_metrics">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fermi.relatedness_metrics.</span></span><span class="sig-name descname"><span class="pre">RelatednessMetrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">spmatrix</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA"><code class="xref py py-class docutils literal notranslate"><span class="pre">MatrixProcessorCA</span></code></a></p>
+<p>Main relatedness methods for binary matrices, with optional statistical validation.</p>
+<p>This class provides tools to compute and validate projection networks
+derived from a binary (typically sparse) matrix.</p>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt>Relatedness metrics</dt><dd><ul class="simple">
+<li><p>Cooccurrence matrix</p></li>
+<li><p>Proximity network</p></li>
+<li><p>Taxonomy network</p></li>
+<li><p>Assist network (from a second bipartite matrix)</p></li>
+</ul>
+</dd>
+<dt>Statistical validation</dt><dd><ul class="simple">
+<li><p>Bonferroni correction</p></li>
+<li><p>False Discovery Rate (FDR)</p></li>
+<li><p>Direct thresholding</p></li>
+</ul>
+</dd>
+<dt>Additional functionality</dt><dd><ul class="simple">
+<li><p>BICM sampling for statistical validation of projections</p></li>
+<li><p>Matrix visualization with customizable sorting</p></li>
+<li><p>Support for sparse matrices, configurable initial conditions,
+and custom row/column labels</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics.get_bicm_projection">
+<span class="sig-name descname"><span class="pre">get_bicm_projection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_iterations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projection_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">second_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">spmatrix</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validation_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics.get_bicm_projection" title="Link to this definition">¶</a></dt>
+<dd><p>Perform BICM sampling and statistically validate a projection network.</p>
+<p>This method generates BICM samples to build a null distribution for
+a chosen one-mode projection, then applies a multiple‐comparison
+correction or threshold to identify significant links.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>alpha</strong> (<em>float</em><em>, </em><em>default=0.05</em>) – Significance level for validation (p-value threshold).</p></li>
+<li><p><strong>num_iterations</strong> (<em>int</em><em>, </em><em>default=10000</em>) – Number of BICM random samples to generate.</p></li>
+<li><p><strong>projection_method</strong> (<em>{'cooccurrence'</em><em>, </em><em>'proximity'</em><em>, </em><em>'taxonomy'</em><em>, </em><em>'assist'}</em><em>, </em><em>optional</em>) – Projection algorithm to apply:
+- ‘cooccurrence’ : raw cooccurrence counts.
+- ‘proximity’    : normalized cooccurrence.
+- ‘taxonomy’     : hierarchical projection.
+- ‘assist’       : assist network (requires <cite>second_matrix</cite>).</p></li>
+<li><p><strong>rows</strong> (<em>bool</em><em>, </em><em>default=True</em>) – If True, project onto rows (row×row matrix); if False, onto columns.</p></li>
+<li><p><strong>second_matrix</strong> (<em>ndarray</em><em> or </em><em>sparse matrix</em><em>, </em><em>optional</em>) – Secondary bipartite matrix for ‘assist’ projection.</p></li>
+<li><p><strong>validation_method</strong> (<em>{'bonferroni'</em><em>, </em><em>'fdr'</em><em>, </em><em>'direct'}</em><em>, </em><em>optional</em>) – Statistical validation procedure:
+- ‘bonferroni’ : Bonferroni correction.
+- ‘fdr’        : False Discovery Rate.
+- ‘direct’     : direct p-value threshold at <cite>alpha</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>validated_relatedness</strong> (<em>ndarray</em>) – Binary matrix (0/1) indicating which links are significant.</p></li>
+<li><p><strong>p_values</strong> (<em>ndarray</em>) – Matrix of p-values from the validation step.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If <cite>projection_method</cite> or <cite>validation_method</cite> is missing or unsupported,
+    or if <cite>second_matrix</cite> is required but not provided.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics.get_projection">
+<span class="sig-name descname"><span class="pre">get_projection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">second_matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">spmatrix</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rows</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projection_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">csr_matrix</span></span></span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics.get_projection" title="Link to this definition">¶</a></dt>
+<dd><p>Compute a one-mode projection from a binary bipartite matrix.</p>
+<p>Depending on the chosen method, returns different networks of relationships
+either between rows or between columns of the input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>second_matrix</strong> (<em>csr_matrix</em><em> or </em><em>ndarray</em><em>, </em><em>optional</em>) – A second binary bipartite matrix required only if
+<cite>projection_method == “assist”</cite>. Must have the same shape
+(in the non-projected dimension) as the primary matrix.</p></li>
+<li><p><strong>rows</strong> (<em>bool</em><em>, </em><em>default=True</em>) – If True, project onto the row-space (i.e., produce a row×row matrix);
+if False, project onto the column-space (column×column matrix).</p></li>
+<li><p><strong>projection_method</strong> (<em>{'cooccurrence'</em><em>, </em><em>'proximity'</em><em>, </em><em>'taxonomy'</em><em>, </em><em>'assist'}</em><em>, </em><em>default='cooccurrence'</em>) – The algorithm to use for projection:
+- <cite>‘cooccurrence’</cite> : raw cooccurrence counts.
+- <cite>‘proximity’</cite>    : normalized cooccurrence (e.g., phi-coefficient).
+- <cite>‘taxonomy’</cite>     : hierarchical or minimum-spanning projection.
+- <cite>‘assist’</cite>       : cross-assist network using <cite>second_matrix</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>projection</strong> – A square matrix of shape (n, n) where n is the number of
+rows if <cite>rows=True</cite> or number of columns if <cite>rows=False</cite>,
+containing the computed projection values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <cite>projection_method</cite> is not one of the supported options
+    or if <cite>second_matrix</cite> is missing when required.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics.load">
+<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load input data as a sparse matrix, store original, and initialize processed copy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_data</strong> (<em>str</em><em> or </em><em>Path</em><em> or </em><em>DataFrame</em><em> or </em><em>ndarray</em><em> or </em><em>list</em>) – Path to file, DataFrame, numpy array, sparse matrix, or edge list.</p></li>
+<li><p><strong>**kwargs</strong> (<em>dict</em>) – Additional keyword arguments for file readers (e.g. sep, header).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The instance itself, with <cite>_original</cite> and <cite>_processed</cite> set.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA" title="fermi.matrix_processor.MatrixProcessorCA">MatrixProcessorCA</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics.mat_to_network">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mat_to_network</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matrix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">spmatrix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">projection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Graph</span></span></span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics.mat_to_network" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a bipartite or projected matrix into a NetworkX graph.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>matrix</strong> (<em>ndarray</em><em> or </em><em>sparse matrix</em>) – The input matrix. If <cite>projection</cite> is False or None, this is
+the biadjacency (bipartite) matrix. If True, this is a
+one-mode projection matrix.</p></li>
+<li><p><strong>projection</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether <cite>matrix</cite> is already a one-mode projection (<cite>True</cite>)
+or a bipartite adjacency (<cite>False</cite> or None).</p></li>
+<li><p><strong>row_names</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – Labels for rows (used as node names in bipartite graph).</p></li>
+<li><p><strong>col_names</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – Labels for columns (used as node names in bipartite graph).</p></li>
+<li><p><strong>node_names</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – Custom names for nodes in a projected graph; must match
+the dimension of <cite>matrix</cite>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>graph</strong> – A NetworkX graph representing either the bipartite structure
+or the one-mode projection.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>networkx.Graph</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <cite>matrix</cite> is not 2-D, or if labels/names lengths do not match.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.relatedness_metrics.RelatednessMetrics.plot_graph">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">plot_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Graph</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interaction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'graph.html'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">figure</span></span></span><a class="headerlink" href="#fermi.relatedness_metrics.RelatednessMetrics.plot_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Visualize a NetworkX graph using Bokeh.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>G</strong> (<em>networkx.Graph</em>) – The graph to be plotted.</p></li>
+<li><p><strong>node_size</strong> (<em>int</em><em>, </em><em>default=5</em>) – Radius of graph nodes in screen units.</p></li>
+<li><p><strong>weight</strong> (<em>bool</em><em>, </em><em>default=True</em>) – If True, edge widths reflect edge weights.</p></li>
+<li><p><strong>layout</strong> (<em>str</em><em>, </em><em>default=''</em>) – Name of layout algorithm: ‘spring’, ‘circular’, etc.</p></li>
+<li><p><strong>save</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True, save the plot to <cite>filename</cite>.</p></li>
+<li><p><strong>interaction</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True, enable hover, zoom, and selection tools.</p></li>
+<li><p><strong>filename</strong> (<em>str</em><em>, </em><em>default='graph.html'</em>) – Output HTML filename when <cite>save=True</cite>.</p></li>
+<li><p><strong>color</strong> (<em>dict</em><em>, </em><em>optional</em>) – Mapping from node identifier to a color specification.</p></li>
+<li><p><strong>names</strong> (<em>bool</em><em>, </em><em>default=False</em>) – If True, display node labels on the plot.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>plot</strong> – A Bokeh figure object containing the rendered graph.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bokeh.plotting.figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class" id="module-fermi.prediction_module">
+<dt class="sig sig-object py" id="fermi.prediction_module.ECPredictor">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fermi.prediction_module.</span></span><span class="sig-name descname"><span class="pre">ECPredictor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'network'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.prediction_module.ECPredictor" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>ECPredictor is a unified framework for predicting links in bipartite networks
+(e.g., countries-technologies) using two distinct strategies:</p>
+<ol class="arabic simple">
+<li><p>Network-based prediction: computes M &#64; B or normalized M &#64; B / sum(B),
+where M is the input bipartite matrix and B is a similarity matrix among columns (e.g., technologies).</p></li>
+<li><p>Machine Learning prediction: learns link probabilities by training a classifier (e.g., Random Forest, XGBoost)
+column-wise over temporally stacked matrices. Cross-validation is supported with row-level splits (e.g., by country).</p></li>
+</ol>
+<p>This class is designed for temporal economic complexity analysis and allows evaluation of predictive models
+both in-sample and on future test matrices.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.ECPredictor.predict_ml_by_rowstack">
+<span class="sig-name descname"><span class="pre">predict_ml_by_rowstack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M_list_train</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y_list_train</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M_test</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.prediction_module.ECPredictor.predict_ml_by_rowstack" title="Link to this definition">¶</a></dt>
+<dd><p>Predict using ML with row-wise stacking of M_list_train and Y_list_train.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>M_list_train</strong> (<em>-</em>) – (features for multiple years)</p></li>
+<li><p><strong>Y_list_train</strong> (<em>-</em>) – (binary targets for corresponding years)</p></li>
+<li><p><strong>M_test</strong> (<em>-</em>) – (features for the year to predict)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>- Y_pred</strong> – predicted scores (probabilities) for each country x technology</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.ECPredictor.predict_ml_crossval">
+<span class="sig-name descname"><span class="pre">predict_ml_crossval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M_list_train</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y_list_train</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">splitter</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.prediction_module.ECPredictor.predict_ml_crossval" title="Link to this definition">¶</a></dt>
+<dd><p>Perform cross-validated ML prediction using row-wise stacked matrices.
+Returns predictions with same shape as stacked training set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>M_list_train</strong> (<em>-</em>) – features over time</p></li>
+<li><p><strong>Y_list_train</strong> (<em>-</em>) – targets over time (binary)</p></li>
+<li><p><strong>splitter</strong> (<em>-</em>) – (e.g., KFold(…))</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>- Y_pred_full</strong> – shape (total_rows, n_technologies)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.ECPredictor.predict_network">
+<span class="sig-name descname"><span class="pre">predict_network</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.prediction_module.ECPredictor.predict_network" title="Link to this definition">¶</a></dt>
+<dd><p>Predict scores using M &#64; B or (M &#64; B) / B if normalize=True</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>B</strong> (<em>-</em>) – similarity matrix (e.g. technologies x technologies)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>- M_hat</strong> – predicted scores matrix (countries x technologies)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">fermi.prediction_module.</span></span><span class="sig-name descname"><span class="pre">SPS</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dfs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">DataFrame</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_boot</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">42</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#fermi.prediction_module.SPS" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>SPS class based entirely on pandas DataFrames for trajectory-based forecasting
+using bootstrap and Nadaraya–Watson regression without peeking ahead in time.
+Chainable wrappers <cite>predict_actor</cite> and <cite>predict_all</cite> allow fluent API.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS.get_analogues">
+<span class="sig-name descname"><span class="pre">get_analogues</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="headerlink" href="#fermi.prediction_module.SPS.get_analogues" title="Link to this definition">¶</a></dt>
+<dd><p>Public wrapper for _compute_analogues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>actor</strong> (<em>str</em>) – Identifier of the actor whose analogues we want to retrieve.</p></li>
+<li><p><strong>year</strong> (<em>int</em>) – The target year for forecasting.</p></li>
+<li><p><strong>delta</strong> (<em>int</em><em>, </em><em>optional</em>) – Forecast horizon; defaults to self.delta_t.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Analogue records indexed by (actor, year).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS.predict_actor">
+<span class="sig-name descname"><span class="pre">predict_actor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'nw'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS"><span class="pre">SPS</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS"><span class="pre">SPS</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.prediction_module.SPS.predict_actor" title="Link to this definition">¶</a></dt>
+<dd><p>Chainable wrapper for predicting a single actor-year.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>actor</strong> (<em>str</em>) – Actor to predict.</p></li>
+<li><p><strong>year</strong> (<em>int</em>) – Year for prediction.</p></li>
+<li><p><strong>method</strong> (<em>{'nw'</em><em>, </em><em>'boot'}</em><em>, </em><em>default='nw'</em>) – Prediction method: Nadaraya–Watson or bootstrap.</p></li>
+<li><p><strong>delta</strong> (<em>int</em><em>, </em><em>optional</em>) – Forecast horizon; defaults to self.delta_t.</p></li>
+<li><p><strong>dims</strong> (<em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Dimensions to include; defaults to self.dimensions.</p></li>
+<li><p><strong>return_samples</strong> (<em>bool</em><em>, </em><em>default=False</em>) – For ‘boot’, whether to return bootstrap samples.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>self</strong> (<em>SPS</em>) – The instance with <cite>nw_actor</cite> or <cite>boot_actor</cite> set.</p></li>
+<li><p><strong>samples</strong> (<em>np.ndarray, optional</em>) – Bootstrap samples (if <cite>method=’boot’</cite> and <cite>return_samples=True</cite>).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS.predict_all">
+<span class="sig-name descname"><span class="pre">predict_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'nw'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS"><span class="pre">SPS</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS"><span class="pre">SPS</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.prediction_module.SPS.predict_all" title="Link to this definition">¶</a></dt>
+<dd><p>Chainable wrapper for batch predictions of all valid actor-years.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>method</strong> (<em>{'nw'</em><em>, </em><em>'boot'}</em><em>, </em><em>default='nw'</em>)</p></li>
+<li><p><strong>delta</strong> (<em>int</em><em>, </em><em>optional</em>) – Forecast horizon; defaults to self.delta_t.</p></li>
+<li><p><strong>dims</strong> (<em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Dimensions to include; defaults to self.dimensions.</p></li>
+<li><p><strong>extra</strong> (<em>pd.DataFrame</em><em>, </em><em>optional</em>) – Additional state entries to append before prediction.</p></li>
+<li><p><strong>return_samples</strong> (<em>bool</em><em>, </em><em>default=False</em>) – For ‘boot’, whether to return list of sample matrices.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>self</strong> (<em>SPS</em>) – The instance with <cite>nw_full</cite> or <cite>boot_full</cite> set.</p></li>
+<li><p><strong>samples_list</strong> (<em>list[np.ndarray], optional</em>) – List of bootstrap sample matrices (if <cite>return_samples=True</cite>).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS.predict_velocity">
+<span class="sig-name descname"><span class="pre">predict_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">actor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">year</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#fermi.prediction_module.SPS.predict_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Chainable wrapper for velocity-based prediction for a single actor-year.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>actor</strong> (<em>str</em>) – Actor to predict.</p></li>
+<li><p><strong>year</strong> (<em>int</em>) – Year for prediction.</p></li>
+<li><p><strong>delta</strong> (<em>int</em><em>, </em><em>optional</em>) – Forecast horizon; defaults to self.delta_t.</p></li>
+<li><p><strong>dims</strong> (<em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Dimensions to include; defaults to self.dimensions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>vel_avg</strong> (<em>np.ndarray</em>) – Mean velocity-based displacement.</p></li>
+<li><p><strong>vel_var</strong> (<em>np.ndarray</em>) – Variance of velocity-based estimates.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="fermi.prediction_module.SPS.with_velocity_correction">
+<span class="sig-name descname"><span class="pre">with_velocity_correction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'nw'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dims</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS"><span class="pre">SPS</span></a></span></span><a class="headerlink" href="#fermi.prediction_module.SPS.with_velocity_correction" title="Link to this definition">¶</a></dt>
+<dd><p>Chainable correction based on velocity: combines base prediction with
+velocity-based estimate using MLE.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>method</strong> (<em>{'nw'</em><em>, </em><em>'boot'}</em><em>, </em><em>default='nw'</em>)</p></li>
+<li><p><strong>delta</strong> (<em>int</em><em>, </em><em>optional</em>) – Forecast horizon; defaults to self.delta_t.</p></li>
+<li><p><strong>dims</strong> (<em>list</em><em>[</em><em>str</em><em>]</em><em>, </em><em>optional</em>) – Dimensions to include; defaults to self.dimensions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>self</strong> – The instance with added ‘corr_pred’ and ‘corr_var’ columns in
+the relevant prediction attribute.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#fermi.prediction_module.SPS" title="fermi.prediction_module.SPS">SPS</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no base prediction found before correction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">fermi</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#fermi.matrix_processor.MatrixProcessorCA"><code class="docutils literal notranslate"><span class="pre">MatrixProcessorCA</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fermi.economic_fitness_complexity.efc"><code class="docutils literal notranslate"><span class="pre">efc</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fermi.relatedness_metrics.RelatednessMetrics"><code class="docutils literal notranslate"><span class="pre">RelatednessMetrics</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fermi.prediction_module.ECPredictor"><code class="docutils literal notranslate"><span class="pre">ECPredictor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fermi.prediction_module.SPS"><code class="docutils literal notranslate"><span class="pre">SPS</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to fermi’s documentation!</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, CREF team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

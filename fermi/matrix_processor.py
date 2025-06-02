@@ -218,21 +218,35 @@ class MatrixProcessorCA:
             if kwargs.get('header', 0)==0 and ext in ['.dat', '.txt']:
                 kwargs['header'] = None
             df = pd.read_csv(path, **kwargs)
+
+            # check if the first column is a column of string, if so assume that it is the column of the indices
+            if kwargs.get('index_col',None) is None:
+                first = df.iloc[:, 0]
+                conv = pd.to_numeric(first, errors="coerce")
+                frac_nan = conv.isna().mean()
+                if frac_nan > 0.5:
+                    # uso la prima colonna come indice e la rimuovo dai dati
+                    df = df.set_index(df.columns[0])
             return self._load_from_dataframe(df)
+
         if ext in ['.xlsx','..xls']:
             df = pd.read_excel(path, **kwargs)
             return self._load_from_dataframe(df)
+
         if ext in ['.mtx','.mm']:
             from scipy.io import mmread
             mat = mmread(str(path))
             return mat.tocsr(), [], []
+
         if ext in ['.npz']:
             mat = sp.load_npz(path, **kwargs)
             return mat.tocsr(), [], []
+
         if ext in ['.npy']:
             arr = np.load(path, **kwargs)
             mat = arr if sp.issparse(arr) else sp.csr_matrix(arr)
             return mat, [], []
+
         raise ValueError(f"Unrecognized format: {ext}")
 
     def _load_from_dataframe(self, df: pd.DataFrame) -> Tuple[csr_matrix, List[str], List[str]]:

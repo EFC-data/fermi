@@ -123,7 +123,24 @@ If you use the `fermi` modules, please cite its location on Github
 
 [Mazzilli2024] [D Mazzilli, M S Mariani, F Morone and A Patelli, *Equivalence between the Fitness-Complexity and the Sinkhorn-Knopp algorithms*, J. Phys. Complex. 5 015010 (2024)](https://doi.org/10.1088/2632-072X/ad2697)
 
+## Credits
 
 __Authors__:
 [CREF Team](www.cref.it)
 
+- [Aurelio Patelli]()
+
+- [Riccardo Piombo]()
+
+- [Matteo Straccamore]()
+
+- [Filippo Santoro]()
+
+- [Valeria Secchini]()
+
+- [Lorenzo Buffa]()
+
+- [Daniele Cirulli]()
+
+### Acknowledgements
+We gratefully acknowledge the invaluable contributions, support, and foundational code provided by Andrea Tacchella, Emanuele Pugliese, Dario Mazzilli, and Andrea Zaccaria.

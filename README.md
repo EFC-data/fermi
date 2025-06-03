@@ -49,7 +49,7 @@ To install `fermi` directly from PyPI in a virtual environment:
 ```bash
 python -m venv fermi-env
 source fermi-env/bin/activate  # or fermi-env\Scripts\activate on Windows
-pip install fermi-cref```
+pip install fermi-cref
 
 ---
 

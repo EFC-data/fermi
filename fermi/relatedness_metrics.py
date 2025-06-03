@@ -1455,11 +1455,12 @@ class RelatednessMetrics(MatrixProcessorCA):
         for start_node, end_node, data in edges_to_show:
             start_indices.append(name_to_index[start_node])
             end_indices.append(name_to_index[end_node])
-            edge_weight = data.get("weight", 1) if weight else 1
-            # Scala i pesi per la visualizzazione
-            visual_width = min(3, max(0.5, edge_weight * 0.1)) if weight else 1
-            line_widths.append(visual_width)  # Ensure minimum line width of 1
 
+            edge_weight = data.get("weight", 1) if weight else 1
+            if projection and spanning_tree:
+                line_widths.append(1)  # Fixed width for spanning tree edges
+            else:
+                line_widths.append(max(1, edge_weight))
             # Color spanning tree edges differently
             if projection and spanning_tree and mst_edges:
                 # All displayed edges are MST edges, so color them prominently
@@ -1509,7 +1510,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         if use_custom_colors and use_color_mapper:
             color_bar = ColorBar(
                 color_mapper=mapper['transform'],
-                title="Custom Color Values (PCI)",
+                title="Custom Color Values",
                 ticker=BasicTicker(),
                 location=(0, 0),
                 orientation="vertical"

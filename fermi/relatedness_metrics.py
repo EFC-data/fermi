@@ -785,9 +785,9 @@ class RelatednessMetrics(MatrixProcessorCA):
             f"Unsupported projection parameter {projection}. projection=True if you intend to plot the projection, and projection=False otherwise.")
 
     @staticmethod
-    def plot_graph(G: nx.Graph, node_size: int = 5, weight: bool = True, layout: str = "", save: bool=False, 
-                   interaction: bool = False, filename: str="graph.html", color: Optional[dict] = None, names: bool = False, 
-                   projection: bool = False, centrality_metric: Optional[str] = None, spanning_tree: bool = False, 
+    def plot_graph(G: nx.Graph, node_size: int = 5, weight: bool = True, layout: str = "", save: bool=False,
+                   interaction: bool = False, filename: str="graph.html", color: Optional[dict] = None, names: bool = False,
+                   projection: bool = False, centrality_metric: Optional[str] = None, spanning_tree: bool = False,
                    seed: int = 42, modularity: bool = False) -> bokeh.plotting.figure:
 
         """
@@ -836,7 +836,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         """
 
         def calculate_tree_layout(mst_graph: nx.Graph, layout_type: str = 'auto', root: Optional[str] = None, seed: int = 42) -> dict:
-           
+
             """Calculate optimized layout for tree structures.
             Parameters:
                 mst_graph (networkx.Graph): The graph to calculate layout for.
@@ -1452,15 +1452,48 @@ class RelatednessMetrics(MatrixProcessorCA):
             # Show all edges between visualized nodes
             edges_to_show = [(start, end, data) for start, end, data in G_visual.edges(data=True)]
 
+        # Calcola i pesi per la normalizzazione quando weight=True e projection=True
+        if weight and projection and not spanning_tree:
+            # Estrai tutti i pesi per normalizzazione
+            all_weights = []
+            for start_node, end_node, data in edges_to_show:
+                edge_weight = data.get("weight", 1)
+                all_weights.append(edge_weight)
+
+            if all_weights:
+                min_weight = min(all_weights)
+                max_weight = max(all_weights)
+                weight_range = max_weight - min_weight
+
+                # Definisci range di spessori desiderati
+                min_line_width = 1
+                max_line_width = 8
+
+                print(f"Peso minimo: {min_weight:.3f}, Peso massimo: {max_weight:.3f}")
+                print(f"Range spessori linee: {min_line_width} - {max_line_width}")
+
         for start_node, end_node, data in edges_to_show:
             start_indices.append(name_to_index[start_node])
             end_indices.append(name_to_index[end_node])
 
             edge_weight = data.get("weight", 1) if weight else 1
+
             if projection and spanning_tree:
-                line_widths.append(1)  # Fixed width for spanning tree edges
+                # Fixed width for spanning tree edges
+                line_widths.append(1)
+            elif weight and projection and not spanning_tree:
+                # Normalizza i pesi per visualizzazione proporzionale
+                if weight_range > 0:
+                    # Normalizza il peso nell'intervallo [min_line_width, max_line_width]
+                    normalized_weight = min_line_width + (edge_weight - min_weight) / weight_range * (max_line_width - min_line_width)
+                    line_widths.append(max(min_line_width, normalized_weight))
+                else:
+                    # Tutti i pesi sono uguali
+                    line_widths.append(2)
             else:
+                # Comportamento standard (non projection o non weight)
                 line_widths.append(max(1, edge_weight))
+
             # Color spanning tree edges differently
             if projection and spanning_tree and mst_edges:
                 # All displayed edges are MST edges, so color them prominently
@@ -1470,7 +1503,6 @@ class RelatednessMetrics(MatrixProcessorCA):
                 # Regular edges
                 edge_colors.append("#CCCCCC")  # Light grey for regular edges
                 edge_alphas.append(0.6)
-
         graph_renderer.edge_renderer.data_source.data = {
             "start": start_indices,
             "end": end_indices,

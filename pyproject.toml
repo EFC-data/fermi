@@ -32,3 +32,7 @@ dependencies = [
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project.urls]
+"Homepage" = "https://github.com/EFC-data/fermi"
+"Bug Tracker" = "https://github.com/EFC-data/fermi/issues"

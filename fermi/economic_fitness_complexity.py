@@ -659,11 +659,7 @@ class efc(MatrixProcessorCA):
           - NODF: float
               Scalar NODF value.
         """
-        print("Computing NODF...")
-        if issparse(self._processed):
-            A = self._processed.toarray()
-        N,M = A.shape
-        
+        print("Computing NODF...")       
         #####   Row degrees k_i and row‐overlaps O_{ij}   #####
         # overlap_rows[i,j] counts how many active entries (1) have columns i and j in common       
         _, k_rows, overlap_rows, k_cols, overlap_cols, N, M = self._compute_overlap_and_degrees()

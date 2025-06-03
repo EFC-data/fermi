@@ -669,9 +669,9 @@ class efc(MatrixProcessorCA):
         _, k_rows, overlap_rows, k_cols, overlap_cols, N, M = self._compute_overlap_and_degrees()
 
         # N^R = sum_{i,j : k_i > k_j > 0} (O_ij / k_j)
-        i_r = k_rows.reshape(-1, 1)  # i_r[i, j] = k_i --> column vector of row degrees with shape (N,1)
-        j_r = k_rows.reshape(1, -1)  # j_r[i, j] = k_j --> row vector of row degrees with shape (1,N)
-        j_mat_r = np.broadcast_to(j_r, (len(k_rows), len(k_rows)))  # shape (N, N)
+        i_r = k_rows[:, np.newaxis]  # i_r[i, j] = k_i --> column vector of row degrees with shape (N,1)
+        j_r = k_rows[np.newaxis, :] # j_r[i, j] = k_j --> row vector of row degrees with shape (1,N)
+
 
         # mask_r[i,j] = True if row i has more 1s of row j AND k_j > 0 so row j has at least one 1
         mask_r = (i_r > j_r) & (j_r > 0)    

@@ -1452,9 +1452,9 @@ class RelatednessMetrics(MatrixProcessorCA):
             # Show all edges between visualized nodes
             edges_to_show = [(start, end, data) for start, end, data in G_visual.edges(data=True)]
 
-        # Calcola i pesi per la normalizzazione quando weight=True e projection=True
+        # Compute normalization weights when weight=True and projection=True
         if weight and projection and not spanning_tree:
-            # Estrai tutti i pesi per normalizzazione
+            # Extract all edge weights for normalization
             all_weights = []
             for start_node, end_node, data in edges_to_show:
                 edge_weight = data.get("weight", 1)
@@ -1465,12 +1465,12 @@ class RelatednessMetrics(MatrixProcessorCA):
                 max_weight = max(all_weights)
                 weight_range = max_weight - min_weight
 
-                # Definisci range di spessori desiderati
+                # Define range of line widths
                 min_line_width = 1
                 max_line_width = 8
 
-                print(f"Peso minimo: {min_weight:.3f}, Peso massimo: {max_weight:.3f}")
-                print(f"Range spessori linee: {min_line_width} - {max_line_width}")
+                # print(f"Peso minimo: {min_weight:.3f}, Peso massimo: {max_weight:.3f}")
+                # print(f"Range spessori linee: {min_line_width} - {max_line_width}")
 
         for start_node, end_node, data in edges_to_show:
             start_indices.append(name_to_index[start_node])
@@ -1482,16 +1482,16 @@ class RelatednessMetrics(MatrixProcessorCA):
                 # Fixed width for spanning tree edges
                 line_widths.append(1)
             elif weight and projection and not spanning_tree:
-                # Normalizza i pesi per visualizzazione proporzionale
+                # Normalize edge weights for proportional line widths
                 if weight_range > 0:
-                    # Normalizza il peso nell'intervallo [min_line_width, max_line_width]
+                    # Normalize the edge weight to the defined line width range
                     normalized_weight = min_line_width + (edge_weight - min_weight) / weight_range * (max_line_width - min_line_width)
                     line_widths.append(max(min_line_width, normalized_weight))
                 else:
-                    # Tutti i pesi sono uguali
+                    # All edges have the same weight, use a default width
                     line_widths.append(2)
             else:
-                # Comportamento standard (non projection o non weight)
+                # Standard edge width when not using weight or spanning tree
                 line_widths.append(max(1, edge_weight))
 
             # Color spanning tree edges differently

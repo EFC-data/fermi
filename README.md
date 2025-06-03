@@ -51,6 +51,13 @@ python -m venv fermi-env
 source fermi-env/bin/activate  # or fermi-env\Scripts\activate on Windows
 pip install fermi-cref
 ```
+### Using fermi-cref on Google Colab
+
+To use `fermi` on Colab, you can install it directly from PyPI with:
+
+```python
+!pip install fermi-cref
+```
 ---
 
 ## 🚀 Basic functionalities

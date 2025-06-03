@@ -1469,9 +1469,6 @@ class RelatednessMetrics(MatrixProcessorCA):
                 min_line_width = 1
                 max_line_width = 8
 
-                # print(f"Peso minimo: {min_weight:.3f}, Peso massimo: {max_weight:.3f}")
-                # print(f"Range spessori linee: {min_line_width} - {max_line_width}")
-
         for start_node, end_node, data in edges_to_show:
             start_indices.append(name_to_index[start_node])
             end_indices.append(name_to_index[end_node])

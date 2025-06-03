@@ -1,5 +1,5 @@
 [project]
-name = "fermi"
+name = "fermi-cref"
 version = "0.1.0"
 description = "FitnEss Relatedness and other MetrIcs"
 readme = "README.md"

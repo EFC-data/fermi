@@ -36,12 +36,6 @@ tqdm
 networkx ≥ 2.6
 bicm ≥ 3.3.1
 ```
-///### Install the module 
-To install prerequisites in a virtual environment you can use the pip installation.
-/// This is commented
-///```bash
-///pip install fermi
-///```
 ### Quick Installation (Recommended)
 
 To install `fermi` directly from PyPI in a virtual environment:

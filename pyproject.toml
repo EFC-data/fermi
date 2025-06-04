@@ -1,20 +1,19 @@
 [project]
 name = "fermi"
 version = "0.1.0"
-description = "FitnEss Relatedness and other MetrIcs"
+description = "the FitnEss, the Relatedness, and other MetrIcs"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
 
 authors = [
-  { name = "Aurelio Patelli", email = "aurelio.patelli@cref.it" },
-  { name = "Riccardo Piombo", email = "riccardo.piombo@cref.it" },
-  { name = "Matteo Straccamore", email = "matteo.straccamore@cref.it" },
   { name = "Lorenzo Buffa", email = "lorenzo.buffa@cref.it" },
   { name = "Daniele Cirulli", email = "daniele.cirulli@cref.it" },
+  { name = "Aurelio Patelli", email = "aurelio.patelli@cref.it" },
+  { name = "Riccardo Piombo", email = "riccardo.piombo@cref.it" },
   { name = "Filippo Santoro", email = "filippo.santoro@cref.it" },
   { name = "Valeria Secchini", email = "valeria.secchini@cref.it" },
-  { name = "Dario Mazzilli", email = "dario.mazzilli@cref.it" },
+  { name = "Matteo Straccamore", email = "matteo.straccamore@cref.it" },
 ]
 
 dependencies = [
@@ -26,7 +25,7 @@ dependencies = [
   "bokeh>=2.4",
   "tqdm>=4.64",
   "scikit-learn>=1.2",
-  "bicm>=3.3.1",
+  "bicm>=3.4.0",
 ]
 
 [build-system]

@@ -36,35 +36,22 @@ tqdm
 networkx ≥ 2.6
 bicm ≥ 3.3.1
 ```
-///### Install the module 
-To install prerequisites in a virtual environment you can use the pip installation.
-/// This is commented
-///```bash
-///pip install fermi
-///```
+### Quick Installation (Recommended)
 
-### Clone the Repository (if necessary) 
-If you wan to create a virtual environment to avoid conflict with the installed version of the requirements, you can follow the code:
+To install `fermi` directly from PyPI in a virtual environment:
+
 ```bash
 python -m venv fermi-env
-source fermi-env/bin/activate
+source fermi-env/bin/activate  # or fermi-env\Scripts\activate on Windows
+pip install fermi-cref
 ```
-To install the `fermi` modules cloning the repository from GitHub, you can follow the code:
-```bash
-git clone https://github.com/EFC-data/fermi.git
-cd fermi
-pip install -e .
-pip install -r requirements.txt
-```
+### Using fermi-cref on Google Colab
 
-### Using colab
-To use fermi on colab cloning the repository, use the following code:
-```bash
-!git clone https://github.com/EFC-data/fermi.git
-%cd fermi
-!pip install -r requirements.txt
-```
+To use `fermi` on Colab, you can install it directly from PyPI with:
 
+```python
+!pip install fermi-cref
+```
 ---
 
 ## 🚀 Basic functionalities

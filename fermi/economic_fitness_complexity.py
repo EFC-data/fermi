@@ -175,8 +175,12 @@ class efc(MatrixProcessorCA):
             return vector / vector.sum(0)
         elif normalization == 'max':
             return vector / vector.max(0)
+        elif normalization == 'min':
+            return vector / vector.min(0)
         elif normalization == 'mean':
             return vector / vector.mean(0)
+        elif normalization == 'none':
+            return vector
         elif normalization == 'zscore':
             vec = (vector - vector.mean(0)) / vector.std(0)
             eps = np.finfo(float).eps

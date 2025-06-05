@@ -1246,141 +1246,288 @@ class RelatednessMetrics(MatrixProcessorCA):
                 centrality_values = nx.betweenness_centrality(graph_for_centrality)
 
 
-    # ===== Main methods to manage colors =====
+        use_robust_color_handling = False
 
-        # Determine if we're using custom colors from the color parameter
+        if projection:
+            if spanning_tree:
+                # Case 1: projection=True AND spanning_tree=True
+                use_robust_color_handling = True
+                print("🔧 Using robust color handling: projection=True AND spanning_tree=True")
+            elif not centrality_metric and not modularity:
+                # Case 2: projection=True but NO centrality_metric and NO modularity
+                use_robust_color_handling = True
+                print("🔧 Using robust color handling: projection=True with no centrality/modularity")
+            else:
+                print("🔧 Using standard color handling: projection=True with centrality or modularity")
+        else:
+            print("🔧 Using standard color handling: projection=False")
+
+        # Initialize variables
         use_custom_colors = False
         use_color_mapper = False
         custom_color_values = None
         mapper = None
 
-        # First, check if we have custom color data
-        if color is not None:
+        # ROBUST COLOR HANDLING (only if use_robust_color_handling=True)
+        if use_robust_color_handling and color is not None:
             import numpy as np
 
-            if isinstance(color, (list, np.ndarray)):
-                # Handle both numeric arrays and string color arrays
-                if len(color) >= len(G.nodes()):
+            # Always initialize default fill_colors
+            fill_colors = ["#1f77b4"] * len(node_list)
+
+            print(f"Processing colors for {len(node_list)} nodes to visualize")
+
+            if isinstance(color, dict):
+                print("Processing dictionary color mapping...")
+
+                # Check that we have at least some nodes in the dictionary
+                available_nodes = [n for n in node_list if n in color]
+                missing_nodes = [n for n in node_list if n not in color]
+
+                if available_nodes:
                     use_custom_colors = True
+                    print(f"Found colors for {len(available_nodes)}/{len(node_list)} nodes")
+                    if missing_nodes:
+                        print(f"Missing colors for nodes: {missing_nodes[:5]}{'...' if len(missing_nodes) > 5 else ''}")
 
-                    # Check if we have string colors or numeric values
-                    sample_value = color[0] if len(color) > 0 else None
-
-                    if isinstance(sample_value, str):
-                        # Handle string colors (hex codes, color names, etc.)
-                        use_color_mapper = False
-
-                        # Create mapping from original graph nodes to color strings
-                        original_nodes = list(G.nodes())
-                        node_color_mapping = {}
-
-                        for i, node in enumerate(original_nodes):
-                            if i < len(color):
-                                node_color_mapping[node] = str(color[i])
-
-                        # Get color values for nodes we're actually visualizing
-                        fill_colors = [node_color_mapping.get(node, "#1f77b4") for node in node_list]
-
-                        print(f"Using custom string color mapping with {len(fill_colors)} colors")
-                        print(f"Sample colors: {fill_colors[:3]}...")
-
-                    else:
-                        # Handle numeric arrays (like PCI values) - existing functionality
-                        use_color_mapper = True
-
-                        # Create mapping from original graph nodes to color values
-                        original_nodes = list(G.nodes())
-                        node_color_mapping = {}
-
-                        for i, node in enumerate(original_nodes):
-                            if i < len(color):
-                                node_color_mapping[node] = float(color[i])
-
-                        # Get color values for nodes we're actually visualizing
-                        custom_color_values = [node_color_mapping.get(node, 0) for node in node_list]
-
-                        # Create color mapper
-                        mapper = linear_cmap(field_name='custom_color', palette=Viridis256,
-                                            low=min(custom_color_values), high=max(custom_color_values))
-
-                        print(f"Using custom numeric color mapping with {len(custom_color_values)} values")
-                        print(f"Color range: {min(custom_color_values):.3f} to {max(custom_color_values):.3f}")
-
-            elif isinstance(color, dict):
-                # Handle dictionary mapping
-                if all(n in color for n in node_list):
-                    use_custom_colors = True
-                    # Check if values are numeric (for color mapping) or direct colors
+                    # Determine the type of values in the dictionary
                     sample_value = next(iter(color.values()))
-                    if isinstance(sample_value, (int, float)):
-                        use_color_mapper = True
-                        custom_color_values = [float(color[node]) for node in node_list]
-                        mapper = linear_cmap(field_name='custom_color', palette=Turbo256,
-                                            low=min(custom_color_values), high=max(custom_color_values))
-                    else:
-                        # Direct color mapping (strings)
-                        use_color_mapper = False
-                        fill_colors = [str(color[node]) for node in node_list]
 
-        # Determine node colors based on priority - CUSTOM COLORS OVERRIDE EVERYTHING
+                    if isinstance(sample_value, (int, float, np.integer, np.floating)):
+                        # Numeric values -> use color mapper
+                        use_color_mapper = True
+                        custom_color_values = [float(color.get(node, 0)) for node in node_list]
+
+                        # Check that there are different values
+                        if len(set(custom_color_values)) > 1:
+                            mapper = linear_cmap(field_name='custom_color', palette=Turbo256,
+                                              low=min(custom_color_values), high=max(custom_color_values))
+                            print(f"Using numeric color mapping - range: {min(custom_color_values):.3f} to {max(custom_color_values):.3f}")
+                        else:
+                            # All values are the same, use fixed color
+                            use_color_mapper = False
+                            fill_colors = ["#1f77b4"] * len(node_list)
+                            print("All numeric values are the same, using default color")
+                    else:
+                        # String values -> direct colors
+                        use_color_mapper = False
+                        fill_colors = [str(color.get(node, "#1f77b4")) for node in node_list]
+                        print(f"Using direct string color mapping")
+                        print(f"Sample colors: {fill_colors[:3]}{'...' if len(fill_colors) > 3 else ''}")
+                else:
+                    print("No matching nodes found in color dictionary, using default colors")
+
+            elif isinstance(color, (list, tuple, np.ndarray)):
+                print(f"Processing {type(color).__name__} color mapping...")
+
+                # Convert to list for easier handling
+                color_list = list(color) if not isinstance(color, list) else color
+
+                if len(color_list) >= len(G.nodes()):
+                    use_custom_colors = True
+
+                    # Create mapping from original nodes to colors
+                    original_nodes = list(G.nodes())
+                    node_color_mapping = {}
+
+                    for i, node in enumerate(original_nodes):
+                        if i < len(color_list):
+                            node_color_mapping[node] = color_list[i]
+
+                    # Determine the type of values
+                    if len(color_list) > 0:
+                        sample_value = color_list[0]
+
+                        if isinstance(sample_value, (int, float, np.integer, np.floating)):
+                            # Numeric values
+                            use_color_mapper = True
+                            custom_color_values = [float(node_color_mapping.get(node, 0)) for node in node_list]
+
+                            # Check that there are different values
+                            if len(set(custom_color_values)) > 1:
+                                mapper = linear_cmap(field_name='custom_color', palette=Viridis256,
+                                                  low=min(custom_color_values), high=max(custom_color_values))
+                                print(f"Using numeric array mapping - range: {min(custom_color_values):.3f} to {max(custom_color_values):.3f}")
+                            else:
+                                use_color_mapper = False
+                                fill_colors = ["#1f77b4"] * len(node_list)
+                                print("All numeric values are the same, using default color")
+
+                        elif isinstance(sample_value, (str, np.str_)):
+                            # String values
+                            use_color_mapper = False
+                            fill_colors = [str(node_color_mapping.get(node, "#1f77b4")) for node in node_list]
+                            print(f"Using string array mapping")
+                            print(f"Sample colors: {fill_colors[:3]}{'...' if len(fill_colors) > 3 else ''}")
+
+                        else:
+                            print(f"Unknown color type: {type(sample_value)}, using default colors")
+                    else:
+                        print("Empty color array, using default colors")
+                else:
+                    print(f"Color array too short ({len(color_list)} < {len(G.nodes())}), using default colors")
+
+            else:
+                print(f"Unsupported color type: {type(color)}, using default colors")
+
+            # Debug for robust handling
+            print(f"Robust color settings:")
+            print(f"  use_custom_colors: {use_custom_colors}")
+            print(f"  use_color_mapper: {use_color_mapper}")
+            print(f"  fill_colors type: {type(fill_colors)}, length: {len(fill_colors) if isinstance(fill_colors, list) else 'N/A'}")
+
+        # STANDARD COLOR HANDLING (original code with small fixes)
+        else:
+            # Use original logic with small corrections to avoid bugs
+            if color is not None:
+                import numpy as np
+
+                if isinstance(color, (list, np.ndarray)):
+                    # Handle both numeric arrays and string color arrays
+                    if len(color) >= len(G.nodes()):
+                        use_custom_colors = True
+
+                        # Check if we have string colors or numeric values
+                        sample_value = color[0] if len(color) > 0 else None
+
+                        if isinstance(sample_value, str):
+                            # Handle string colors (hex codes, color names, etc.)
+                            use_color_mapper = False
+
+                            # Create mapping from original graph nodes to color strings
+                            original_nodes = list(G.nodes())
+                            node_color_mapping = {}
+
+                            for i, node in enumerate(original_nodes):
+                                if i < len(color):
+                                    node_color_mapping[node] = str(color[i])
+
+                            # Get color values for nodes we're actually visualizing
+                            fill_colors = [node_color_mapping.get(node, "#1f77b4") for node in node_list]
+
+                            print(f"Using custom string color mapping with {len(fill_colors)} colors")
+                            print(f"Sample colors: {fill_colors[:3]}...")
+
+                        else:
+                            # Handle numeric arrays (like PCI values) - existing functionality
+                            use_color_mapper = True
+
+                            # Create mapping from original graph nodes to color values
+                            original_nodes = list(G.nodes())
+                            node_color_mapping = {}
+
+                            for i, node in enumerate(original_nodes):
+                                if i < len(color):
+                                    node_color_mapping[node] = float(color[i])
+
+                            # Get color values for nodes we're actually visualizing
+                            custom_color_values = [node_color_mapping.get(node, 0) for node in node_list]
+
+                            # Create color mapper
+                            mapper = linear_cmap(field_name='custom_color', palette=Viridis256,
+                                                low=min(custom_color_values), high=max(custom_color_values))
+
+                            print(f"Using custom numeric color mapping with {len(custom_color_values)} values")
+                            print(f"Color range: {min(custom_color_values):.3f} to {max(custom_color_values):.3f}")
+
+                elif isinstance(color, dict):
+                    # Handle dictionary mapping - FIX: use 'any' instead of 'all'
+                    if any(n in color for n in node_list):
+                        use_custom_colors = True
+                        # Check if values are numeric (for color mapping) or direct colors
+                        sample_value = next(iter(color.values()))
+                        if isinstance(sample_value, (int, float)):
+                            use_color_mapper = True
+                            custom_color_values = [float(color.get(node, 0)) for node in node_list]
+                            mapper = linear_cmap(field_name='custom_color', palette=Turbo256,
+                                                low=min(custom_color_values), high=max(custom_color_values))
+                        else:
+                            # Direct color mapping (strings)
+                            use_color_mapper = False
+                            fill_colors = [str(color.get(node, "#1f77b4")) for node in node_list]
+
+        # ===== FINAL COLOR DETERMINATION =====
+        # Now handle priority logic (this part always remains the same)
+
         if use_custom_colors and use_color_mapper:
-            # Custom numeric colors take HIGHEST priority - override centrality/modularity
-            fill_colors = ["#1f77b4"] * len(node_list)  # Default, will be overridden by mapper
-            print("Using custom numeric colors - overriding any centrality/modularity coloring")
+            # Custom numeric colors - MAX PRIORITY
+            print("🎨 Using custom numeric colors with color mapper")
+            # fill_colors will be set by the mapper
+            if 'fill_colors' not in locals():
+                fill_colors = ["#1f77b4"] * len(node_list)
 
         elif use_custom_colors and not use_color_mapper:
-            # Direct color mapping (string colors) takes HIGHEST priority - override centrality/modularity
-            # fill_colors already set above
-            print("Using custom string colors - overriding any centrality/modularity coloring")
+            # Custom string colors - MAX PRIORITY
+            print("🎨 Using custom string colors")
+            # fill_colors should already be set, security check
+            if 'fill_colors' not in locals() or not isinstance(fill_colors, list):
+                print("⚠️  fill_colors not properly set, using default")
+                fill_colors = ["#1f77b4"] * len(node_list)
 
         elif projection and modularity and communities:
-            # Use community membership for coloring (normal functionality when no custom colors)
+            # Community colors - only if there are no custom colors or centrality metrics
+            print("🎨 Using community-based colors")
             fill_colors = []
             for node in node_list:
                 community_id = node_to_community.get(node, 0)
                 fill_colors.append(community_colors[community_id])
 
         elif projection and centrality_metric in ['degree', 'closeness', 'betweenness']:
-            # Use centrality for coloring (normal functionality when no custom colors)
+            # Centrality colors - only if there are no custom colors or community metrics
+            print(f"🎨 Using {centrality_metric} centrality colors")
             centrality_vals = [centrality_values[node] for node in node_list]
-
-            # Create the color mapper - we'll use it directly in the glyph rather than pre-computing colors
             mapper = linear_cmap(field_name='centrality', palette=Viridis256,
                                 low=min(centrality_vals), high=max(centrality_vals))
-            # Default fill colors - will be overridden by the mapper
-            fill_colors = ["#1f77b4"] * len(node_list)
+            fill_colors = ["#1f77b4"] * len(node_list)  # Default, will be overridden by mapper
 
         elif is_bipartite and not projection:
+            # Bipartite colors
+            print("🎨 Using bipartite colors")
             top_nodes = {n for n, d in G_visual.nodes(data=True) if d.get("bipartite") == 0}
             bottom_nodes = set(G_visual.nodes) - top_nodes
-
             fill_colors = [
                 Spectral4[0] if node in top_nodes else Spectral4[1]
                 for node in node_list
             ]
         else:
-            # Default coloring
+            # Default colors
+            print("🎨 Using default colors")
             fill_colors = [Spectral4[0] for _ in node_list]
 
-        # Node renderer data
+        # ===== CREATE ROBUST NODE_DATA  =====
+        # Node renderer data - make sure all necessary fields are present
         node_data = {
             "index": node_indices,
             "fill_color": fill_colors,
             "name": [str(node) for node in node_list]
         }
 
-        # Add custom color values to node data if using color mapper
-        if use_custom_colors and use_color_mapper:
+        # Add custom color values if necessary
+        if use_custom_colors and use_color_mapper and custom_color_values is not None:
             node_data["custom_color"] = custom_color_values
+            print(f"Added custom_color field with {len(custom_color_values)} values")
 
-        # Add centrality values to node data if calculated
+        # Add centrality values if computed (and not using custom colors or color mapper)
         if centrality_values and not (use_custom_colors and use_color_mapper):
             node_data["centrality"] = [centrality_values.get(node, 0) for node in node_list]
+            print(f"Added centrality field")
 
-        # Add community information to node data
+        # Add community info if available
         if projection and modularity and communities:
             node_data["community"] = [f"Community {node_to_community.get(node, 0) + 1}" for node in node_list]
+            print(f"Added community field")
 
+        print(f"Node data fields: {list(node_data.keys())}")
+
+        # Verify consistency of node_data (only if robust color handling is enabled)
+        if use_robust_color_handling:
+            data_lengths = [len(v) for v in node_data.values()]
+            if len(set(data_lengths)) > 1:
+                print("⚠️  WARNING: Inconsistent data lengths in node_data!")
+                for key, val in node_data.items():
+                    print(f"  {key}: {len(val)}")
+            else:
+                print("✅ All node_data fields have consistent lengths")
         graph_renderer.node_renderer.data_source.data = node_data
 
         # Node glyph - handle custom colors with mapper
@@ -1452,9 +1599,9 @@ class RelatednessMetrics(MatrixProcessorCA):
             # Show all edges between visualized nodes
             edges_to_show = [(start, end, data) for start, end, data in G_visual.edges(data=True)]
 
-        # Compute normalization weights when weight=True and projection=True
+        # Compute edge normalization weights when weight=True and projection=True
         if weight and projection and not spanning_tree:
-            # Extract all edge weights for normalization
+            # Extract all edge weights to normalize
             all_weights = []
             for start_node, end_node, data in edges_to_show:
                 edge_weight = data.get("weight", 1)
@@ -1465,7 +1612,7 @@ class RelatednessMetrics(MatrixProcessorCA):
                 max_weight = max(all_weights)
                 weight_range = max_weight - min_weight
 
-                # Define range of line widths
+                # Define minimum and maximum line widths for visualization
                 min_line_width = 1
                 max_line_width = 8
 
@@ -1479,16 +1626,16 @@ class RelatednessMetrics(MatrixProcessorCA):
                 # Fixed width for spanning tree edges
                 line_widths.append(1)
             elif weight and projection and not spanning_tree:
-                # Normalize edge weights for proportional line widths
+                # Normalize edge weights for visualization
                 if weight_range > 0:
-                    # Normalize the edge weight to the defined line width range
+                    # Normalizza il peso nell'intervallo [min_line_width, max_line_width]
                     normalized_weight = min_line_width + (edge_weight - min_weight) / weight_range * (max_line_width - min_line_width)
                     line_widths.append(max(min_line_width, normalized_weight))
                 else:
                     # All edges have the same weight, use a default width
                     line_widths.append(2)
             else:
-                # Standard edge width when not using weight or spanning tree
+                # Default behavior (not projection or not weight)
                 line_widths.append(max(1, edge_weight))
 
             # Color spanning tree edges differently

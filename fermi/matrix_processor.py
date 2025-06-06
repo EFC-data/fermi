@@ -225,9 +225,8 @@ class MatrixProcessorCA:
                 conv = pd.to_numeric(first, errors="coerce")
                 frac_nan = conv.isna().mean()
                 if frac_nan > 0.5:
-                    # uso la prima colonna come indice e la rimuovo dai dati
                     df = df.set_index(df.columns[0])
-            return self._load_from_dataframe(df)
+            return self._load_from_dataframe(df.fillna(0))
 
         if ext in ['.xlsx','..xls']:
             df = pd.read_excel(path, **kwargs)
@@ -252,7 +251,9 @@ class MatrixProcessorCA:
     def _load_from_dataframe(self, df: pd.DataFrame) -> Tuple[csr_matrix, List[str], List[str]]:
         rows = df.index.tolist() if not df.index.equals(pd.RangeIndex(len(df))) else []
         cols = df.columns.tolist() if not df.columns.equals(pd.RangeIndex(len(df.columns))) else []
-        return sp.csr_matrix(df.values), rows, cols
+        mat = sp.csr_matrix(df.values)
+        mat.eliminate_zeros()
+        return mat, rows, cols
 
     def _load_from_other(self, obj: Any) -> csr_matrix:
         if sp.issparse(obj):

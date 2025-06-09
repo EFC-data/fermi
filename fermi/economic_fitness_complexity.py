@@ -663,7 +663,7 @@ class efc(MatrixProcessorCA):
           - NODF: float
               Scalar NODF value.
         """
-        print("Computing NODF...")       
+        #print("Computing NODF...")
         #####   Row degrees k_i and row‐overlaps O_{ij}   #####
         # overlap_rows[i,j] counts how many active entries (1) have columns i and j in common       
         _, k_rows, overlap_rows, k_cols, overlap_cols, N, M = self._compute_overlap_and_degrees()
@@ -741,7 +741,7 @@ class efc(MatrixProcessorCA):
         - S_NODF: float
             Scalar Stable NODF value.
         """
-        print("Computing S-NODF...")
+        #print("Computing S-NODF...")
         _, k_r, O_r, k_c, O_c, N, M = self._compute_overlap_and_degrees()
 
         # --- Rows ---

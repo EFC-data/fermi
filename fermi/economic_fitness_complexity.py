@@ -542,6 +542,8 @@ class efc(MatrixProcessorCA):
 
         # Main iterative loop
         for iterat in range(max_iteration):
+            if verbose and iterat == 0:
+                print(">>> convergence threshold (min_distance):", min_distance)
 
             # colpos selects which past iteration to read from (rolling buffer)
             colpos = iterat % tail
@@ -591,11 +593,10 @@ class efc(MatrixProcessorCA):
 
             elif check_stop == 'distance':
                 distance = np.abs(fit[newpos] - fit[colpos]).sum()
-                if verbose:
-                    print("iteration:", iterat, "L1 convergence:", distance)
-                if iterat > max_iteration // 10:
-                    if distance < min_distance:
-                        break
+                if iterat > max_iteration // 10 and distance < min_distance:
+                    if verbose:
+                        print(f">>> Breaking at iter {iterat} (L1 convergence: {distance:.2e} < {min_distance})")
+                    break
 
         if normalization == 'sum' and not with_dummy:
             return fit[newpos] * dim[0], com[newpos] * dim[1]

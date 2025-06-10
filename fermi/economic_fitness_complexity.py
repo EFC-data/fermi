@@ -585,6 +585,8 @@ class efc(MatrixProcessorCA):
                 if (iterat % 8 == 7) and (iterat > max_iteration // 10):
                     T = self._minimum_crossing_time(fit, iterat, tail)
                     if T + iterat + 1 > max_iteration:  # if the next swap is expected after max_iteration stop
+                        if verbose:
+                            print("iteration:", iterat, "crossing time:", T)
                         break
 
             elif check_stop == 'distance':

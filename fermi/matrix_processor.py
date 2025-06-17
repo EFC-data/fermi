@@ -188,16 +188,32 @@ class MatrixProcessorCA:
         """
         Retrieve the current processed matrix.
 
+        Parameters
+        ----------
+          - dense : bool, default False
+              If True, return the "dense" matrix as numpy array.
+          - aspandas : bool, default False
+              If True, returns results as pandas DataFrames with appropriate labels.
+
         Returns
         -------
         csr_matrix
             The processed sparse matrix.
         """
         if dense:
-            return self._processed.toarray()
+            return np.array(self._processed.toarray())
         if aspandas:
             return pd.DataFrame(self._processed.toarray(), index=self.global_row_labels, columns=self.global_col_labels)
         return self._processed
+
+    # -----------------------------
+    # reset the _processed matrix
+    # -----------------------------
+    def reset(self) -> None:
+        """
+        Set _processed as a copy of _original
+        """
+        self._processed = self._original.copy()
 
     # -----------------------------
     # Internal Loading Helpers

@@ -1060,7 +1060,7 @@ class efc(MatrixProcessorCA):
             set0, set1 = self.get_diversification_ubiquity()
             set0 = np.argsort(set0)[::-1]
             set1 = np.argsort(set1)[::-1]
-        elif index == 'no':
+        elif index == 'no' or index == 'none':
             set0 = np.arange(self.shape[0])
             set1 = np.arange(self.shape[1])
         elif index == 'invert_x':

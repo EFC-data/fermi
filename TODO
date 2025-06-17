@@ -1,0 +1,16 @@
+features we have to implement:
+
+- use better the _original variable: maybe create a function forcing the _processed to be emptied
+
+- manager of databases: create a load_database function, stacking all the matrices on _processed
+    -> a variable indicating the number of matrices stored
+    -> a variable indicating the labels of the different matrices (such as the years)
+    -> since we have a public google drive where we store the data, would be nice to automatize their download...
+
+- add the possibility to get the errors from the SPS method
+
+- add the documentations properly
+
+- add in the plot_graph routine(s) the possibility to define the descriptions
+
+- a routine removing the empty rows and columns

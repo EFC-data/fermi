@@ -1,10 +1,9 @@
-import os
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from pathlib import Path
 from typing import Any, List, Tuple, Union
-from scipy.sparse import csr_matrix, diags, issparse
+from scipy.sparse import csr_matrix
 from bicm import BipartiteGraph
 import copy
 
@@ -185,16 +184,36 @@ class MatrixProcessorCA:
     # -----------------------------
     # Accessor
     # -----------------------------
-    def get_matrix(self) -> csr_matrix:
+    def get_matrix(self, dense=False, aspandas=False) -> csr_matrix:
         """
         Retrieve the current processed matrix.
+
+        Parameters
+        ----------
+          - dense : bool, default False
+              If True, return the "dense" matrix as numpy array.
+          - aspandas : bool, default False
+              If True, returns results as pandas DataFrames with appropriate labels.
 
         Returns
         -------
         csr_matrix
             The processed sparse matrix.
         """
+        if dense:
+            return np.array(self._processed.toarray())
+        if aspandas:
+            return pd.DataFrame(self._processed.toarray(), index=self.global_row_labels, columns=self.global_col_labels)
         return self._processed
+
+    # -----------------------------
+    # reset the _processed matrix
+    # -----------------------------
+    def reset(self) -> None:
+        """
+        Set _processed as a copy of _original
+        """
+        self._processed = self._original.copy()
 
     # -----------------------------
     # Internal Loading Helpers

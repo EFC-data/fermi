@@ -7,10 +7,16 @@ features we have to implement:
     -> a variable indicating the labels of the different matrices (such as the years)
     -> since we have a public google drive where we store the data, would be nice to automatize their download...
 
-- add the possibility to get the errors from the SPS method
-
 - add the documentations properly
 
 - add in the plot_graph routine(s) the possibility to define the descriptions
 
 - a routine removing the empty rows and columns
+
+In prediction module
+- The class should return the vector field relative to the state matrix at a fixed delta_t.
+- The class should take as input a vector of sigmas (one relative to the Fitness direction and one relative to the GDP direction).
+- The class should handle a vector of weights (one relative to the Fitness direction and one relative to the GDP direction).
+- The two previous points can be generalized to N different dimensions
+- The class should be able to find those points which the predicted distro is not gaussian but multimodal.
+- Estimate the errors 

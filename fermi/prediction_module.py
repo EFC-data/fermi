@@ -252,7 +252,11 @@ class SPS:
         self.nw_actor: pd.DataFrame | None = None       # refers to a single actor
 
         # Bootstrap
-        self.boot_actor: pd.DataFrame | None = None     
+        self.boot_actor: pd.DataFrame | None = None  
+
+        # Placeholder for velocity-based predictions
+        self.vel_actor = None
+        self.var_vel_actor = None  
 
 
     def _compute_analogues(self, actor: str, year: int, delta: int) -> pd.DataFrame:
@@ -599,11 +603,11 @@ class SPS:
             raise ValueError("Method must be 'nw' or 'boot'.")
 
 
-    def _velocity_predict(self,
-                           actor: str,
-                           year: int,
-                           delta: int | None = None,
-                           dims: list[str] | None = None) -> tuple[np.ndarray, np.ndarray]:
+    def predict_actor_velocity(self,
+                actor: str,
+                year: int,
+                delta: int | None = None,
+                dims: list[str] | None = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Internal method: forecasts displacement and variance based solely on
         past velocities (first differences).
@@ -611,7 +615,9 @@ class SPS:
         Parameters
         ----------
         actor : str
+            Actor to predict.
         year : int
+            Year for prediction.
         delta : int, optional
             Forecast horizon; defaults to self.delta_t.
         dims : list[str], optional
@@ -621,13 +627,14 @@ class SPS:
         -------
         delta_vel : np.ndarray
             velocity computed as most (recent value - value delta steps ago) / delta
-        sigma_vel : np.ndarray
+        var_vel : np.ndarray
             Variance of the estimated velocity, computed as the sample variance of 
             the one-year displacements and scaled by the horizon delta.
 
         Raises
         ------
         ValueError
+            If the actor has no history.
             If the observations at year-delta or year are NaN.
             If the actor has insufficient history for velocity computation.
         """
@@ -640,6 +647,10 @@ class SPS:
                 .loc[actor]
                 .sort_index(level='year')
         )
+
+        if history.empty:
+            raise ValueError(f"No history for actor '{actor}'.")
+        
         years = history.index.get_level_values('year').astype(int).values
         
         # Restrict to years ≤ target
@@ -669,39 +680,11 @@ class SPS:
         one_year_disp = vals[1:][consecutive]- vals[:-1][consecutive]
 
         # Sample variance of those displacements, scaled by the horizon delta
-        sigma_vel = one_year_disp.var(axis=0, ddof=1) * delta
+        var_vel = one_year_disp.var(axis=0, ddof=1) * delta
 
-        return delta_vel, sigma_vel
+        self.vel_actor = delta_vel
+        self.var_vel_actor = var_vel
+
+        return self
 
 
-    def get_velocity(self,
-                              actor: str,
-                              year: int,
-                              delta: int | None = None,
-                              dims: list[str] | None = None) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Chainable wrapper for velocity-based prediction for a single actor-year.
-
-        Parameters
-        ----------
-        actor : str
-            Actor to predict.
-        year : int
-            Year for prediction.
-        delta : int, optional
-            Forecast horizon; defaults to self.delta_t.
-        dims : list[str], optional
-            Dimensions to include; defaults to self.dimensions.
-
-        Returns
-        -------
-        vel_avg : np.ndarray
-            Mean velocity displacement.
-        vel_var : np.ndarray
-            Variance of estimated velocity.
-        """
-        delta = delta or self.delta_t
-        dims  = dims  or self.dimensions
-
-        vel_avg, vel_var = self._velocity_predict(actor, year, delta, dims)
-        return vel_avg, vel_var

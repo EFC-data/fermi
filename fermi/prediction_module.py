@@ -207,6 +207,10 @@ class SPS:
         - All DataFrames are reindexed to the full range of years, with missing entries as NaN.
         - Builds a long-form `state_matrix` (MultiIndex: actor * year) holding all dimensions.
         - Placeholders for later results (`nw_actor`,`boot_actor`) are created.
+
+        References
+        ----------
+        - A. Tacchella, D. Mazzilli, L. Pietronero, A dynamical systems approach to gross domestic product forecasting, Nature Physics 14 (8), 861-865
         """
         # Input validation: at least one DataFrame
         if not data_dfs:
@@ -257,6 +261,9 @@ class SPS:
         # Placeholder for velocity-based predictions
         self.vel_actor = None
         self.var_vel_actor = None  
+
+        # Placeholder for combined SPS + velocity predictions
+        self.sps_vel_actor: pd.DataFrame | None = None
 
 
     def _compute_analogues(self, actor: str, year: int, delta: int) -> pd.DataFrame:
@@ -687,4 +694,79 @@ class SPS:
 
         return self
 
+    def sps_plus_velocity(self,
+                        actor: str,
+                        year: int,
+                        method: str = 'nw',
+                        delta: int | None = None,
+                        dims: list[str] | None = None) -> 'SPS':
+        """
+        Combine SPS forecast and velocity forecast via precision-weighting:
+            mu    = (mu_sps/sigma_sps + mu_vel/sigma_vel) / (1/sigma_sps + 1/sigma_vel)
+            sigma = 1 / (1/sigma_sps + 1/sigma_vel)
 
+        Parameters
+        ----------
+        actor : str
+            Actor to predict.
+        year : int
+            Year for prediction.
+        method : {'nw', 'boot'}, default='nw'
+            Prediction method: Nadaraya-Watson or bootstrap.
+        delta : int, optional
+            Forecast horizon; defaults to self.delta_t.
+        dims : list[str], optional
+            Dimensions to include; defaults to self.dimensions.
+
+        Returns
+        -------
+        self : SPS
+            The instance with `sps_vel_actor` set, containing combined predictions.
+
+        References
+        """
+
+        delta = delta or self.delta_t
+        dims = dims or self.dimensions
+
+        # Get SPS-based forecast
+        self.predict_actor(actor=actor, year=year, method=method, delta=delta, dims=dims)
+
+        # Get velocity-based forecast
+        self.predict_actor_velocity(actor=actor, year=year, delta=delta, dims=dims)
+
+        # Extract SPS mean & variance
+        idx = (actor, year)
+        if method == 'nw':
+            row = self.nw_actor.loc[idx]         # fields: 'nw_avg', 'nw_var', etc.
+            mu_sps, var_sps = row['nw_avg'], row['nw_var']
+        else:
+            row = self.boot_actor.loc[idx]       # fields: 'boot_avg', 'boot_var', ...
+            mu_sps, var_sps = row['boot_avg'], row['boot_var']
+    
+        # Extract velocity mean & variance
+        mu_vel  = self.vel_actor
+        var_vel = self.var_vel_actor
+
+        # Precision-weighted combination
+        prec_sps = 1.0 / var_sps
+        prec_vel = 1.0 / var_vel
+        combined_var = 1.0 / (prec_sps + prec_vel)
+        combined_mu  = combined_var * (mu_sps * prec_sps + mu_vel * prec_vel)
+
+        # Compute combined prediction
+        x0 = self.state_matrix.loc[idx, dims].astype(float).values
+        combined_pred = x0 + combined_mu
+
+        # Store the result in a new DataFrame
+        df = pd.DataFrame(
+        [{
+            'combined_var':  combined_var,
+            'combined_mu':   combined_mu,
+            'combined_pred': combined_pred
+        }],
+        index=pd.MultiIndex.from_tuples([idx], names=['actor', 'year'])
+    )
+        self.sps_vel_actor = df
+        return self
+    

@@ -170,14 +170,14 @@ class SPS:
     """
     SPS class based entirely on pandas DataFrames for trajectory-based forecasting
     using bootstrap and Nadaraya–Watson regression without peeking ahead in time.
-    Chainable wrappers `predict_actor` and `predict_all` allow fluent API.
+    Chainable wrappers `predict_actor` allow fluent API.
     """
     def __init__(self,
                  data_dfs: dict[str, pd.DataFrame],
                  delta_t: int = 5,
                  sigma: float = 0.5,
                  n_boot: int = 100,
-                 seed: int | None = 42
+                 seed: int | None = 42   # The Answer to the Ultimate Question of Life, the Universe, and Everything 
                 ) -> None:
         """
         Initialize an SPS forecaster on a set of trajectory DataFrames.
@@ -185,12 +185,12 @@ class SPS:
         Parameters
         ----------
         data_dfs : dict[str, pd.DataFrame]
-            A mapping from dimension names (e.g. 'x', 'y', …) to pandas DataFrames.
-            Each DataFrame must be indexed by actor and have columns representing years.
+            dictionary of DataFrames that must be indexed by actor and have columns representing years.
+            Each DataFrame represents a different dimension (e.g., GDP, fitness) of the actors' trajectories.
         delta_t : int, default=5
             Forecast horizon (number of years ahead to predict).
         sigma : float, default=0.5
-            Bandwidth for the Gaussian kernel in Nadaraya–Watson weighting.
+            Bandwidth for the Gaussian kernel in Nadaraya-Watson weighting.
         n_boot : int, default=100
             Number of bootstrap samples to draw when using the bootstrap method.
         seed : int or None, default=42
@@ -205,8 +205,8 @@ class SPS:
         -----
         - Actors present in one DataFrame but missing in another will have rows of NaN for missing dimensions.
         - All DataFrames are reindexed to the full range of years, with missing entries as NaN.
-        - Builds a long‑form `state_matrix` (MultiIndex: actor * year) holding all dimensions.
-        - Placeholders for later results (`nw_actor`, `nw_full`, `boot_actor`, `boot_full`) are created.
+        - Builds a long-form `state_matrix` (MultiIndex: actor * year) holding all dimensions.
+        - Placeholders for later results (`nw_actor`,`boot_actor`) are created.
         """
         # Input validation: at least one DataFrame
         if not data_dfs:
@@ -249,12 +249,11 @@ class SPS:
 
         ### Placeholders for chainable results ###
         # Nadaraya-Watson
-        self.nw_actor: pd.DataFrame | None = None       # df for a single actor
-        self.nw_full: pd.DataFrame | None = None        # df for all actors
+        self.nw_actor: pd.DataFrame | None = None       # refers to a single actor
 
         # Bootstrap
-        self.boot_actor: pd.DataFrame | None = None     # df for a single actor
-        self.boot_full: pd.DataFrame | None = None      # df for all actors
+        self.boot_actor: pd.DataFrame | None = None     
+
 
     def _compute_analogues(self, actor: str, year: int, delta: int) -> pd.DataFrame:
         """
@@ -336,25 +335,25 @@ class SPS:
 
         Returns
         -------
-        predict_point : np.ndarray
+        point_to_predict : np.ndarray
             State vector at (actor, year).
         weights : np.ndarray
             Kernel or sampling weights for analogues.
         delta_X : np.ndarray
-            Displacements of analogues over `delta` years.
+            Displacements of `point_to_predict` over `delta` years.
 
         Raises
         ------
         ValueError
             If no data for the specified actor/year or no analogues found.
         """
-        # predict point
+        # starting point
         try:
             point_to_predict = self.state_matrix.loc[(actor, year), dims].astype(float).values
         except KeyError:
             raise ValueError(f"No data for actor '{actor}' at year {year} with delta = {delta}.")
 
-        # Fetch analogues
+        # Fetch analogues of the actor at the specified year
         analogues = self._compute_analogues(actor, year, delta)
         if analogues.empty:
             raise ValueError(f"No analogues found for actor '{actor}' at year {year} with delta={delta}.")
@@ -366,7 +365,7 @@ class SPS:
         future.index = start.index
         start_vals = start.values
         
-        # Compute displacements
+        # Compute displacements of the analogues
         delta_X = future.values - start_vals
         
         # Clean invalid entries
@@ -391,7 +390,7 @@ class SPS:
                              dims: list[str] | None = None
                            ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Perform Nadaraya–Watson regression for a single actor-year.
+        Perform Nadaraya-Watson regression for a single actor-year.
 
         Parameters
         ----------
@@ -431,19 +430,21 @@ class SPS:
         # compute Nadaraya - Watson denominator
         denom = weights.sum()
         if denom == 0:
-            raise ValueError("All regression weights are zero; increase sigma or relax filters.")
+            raise ValueError("All regression weights are zero for actor '{actor}' at year {year} (delta={delta});" \
+            "cannot perform Nadaraya-Watson regression.")
         
-        # Compute avrage displacements (weighted average of all delta X)    
+        # Compute average displacements (weighted average of all delta X)    
         x_nw = (weights[:, None] * delta_X).sum(axis=0) / denom
         
-        # Compute avrage square displacements    
+        # Compute average square displacements    
         var_nw = (weights[:, None] * (delta_X - x_nw)**2).sum(axis=0) / denom
         
         # Compute the predicted position of x0
         prediction = x0 + x_nw
                     
         return x_nw, var_nw, prediction, weights, delta_X    
-        
+
+
     def _bootstrap_regression(self,
                              actor: str,
                              year: int,
@@ -452,7 +453,7 @@ class SPS:
                              return_samples: bool = False
                              ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Perform bootstrap resampling for a single actor-year prediction.
+        Perform vectorized bootstrap resampling for a single actor-year prediction.
 
         Parameters
         ----------
@@ -477,7 +478,7 @@ class SPS:
             Sampling probabilities for analogues.
         delta_X : np.ndarray
             Original analogue displacements.
-        samples : np.ndarray, optional
+        pred_samples : np.ndarray, optional
             Full bootstrap sample trajectories (if `return_samples=True`).
         """
         if delta is None:
@@ -493,32 +494,27 @@ class SPS:
         
         # Number of samples to bootstrap
         n = len(delta_X)
-        samples = np.empty((self.n_boot, delta_X.shape[1]))
+
+        # Draw all bootstrap indices at once: shape (n_boot, n)
+        all_idx = self.rng.choice(n, size=(self.n_boot, n), replace=True, p=probs)
         
-        # Bootstrap sampling: creation of *n_boot* batches
-        for b in range(self.n_boot):
-            # Choose n different displacements among the delta_X set
-            idx = self.rng.choice(n, size=n, replace=True, p=probs)
-            
-            # Compute the average displacements
-            dX_sample = delta_X[idx].mean(axis=0)
-            
-            # Create the sampled probability distribution
-            samples[b] = x0 + dX_sample
-        
-        # mean of the sampled prob distro    
-        x_boot = samples.mean(axis=0)
-        
-        # std dev of the sampled prob distro    
-        sigma_boot = samples.std(axis=0, ddof=1)
-        
+        # gather all displacements at once
+        disp_samples = delta_X[all_idx].mean(axis=1)
+
+        # Compute mean and std of the displacement samples
+        x_boot = disp_samples.mean(axis=0)
+        sigma_boot = disp_samples.std(axis=0, ddof=1)
+
         # Bootstrap prediction
         prediction = x0 + x_boot
-        
+
+        # If return_samples=True, add x0 back to each sample:
         if return_samples:
-            return x_boot, sigma_boot, prediction, weights, delta_X, samples
+            pred_samples = disp_samples + x0
+            return x_boot, sigma_boot, prediction, weights, delta_X, pred_samples
+
         return x_boot, sigma_boot, prediction, weights, delta_X
-    
+
     
     def predict_actor(self,
                       actor: str,
@@ -538,7 +534,7 @@ class SPS:
         year : int
             Year for prediction.
         method : {'nw', 'boot'}, default='nw'
-            Prediction method: Nadaraya–Watson or bootstrap.
+            Prediction method: Nadaraya-Watson or bootstrap.
         delta : int, optional
             Forecast horizon; defaults to self.delta_t.
         dims : list[str], optional
@@ -557,7 +553,7 @@ class SPS:
             delta = self.delta_t
         
         if dims is None:
-            dimes = self.dimensions
+            dims = self.dimensions
 
         idx = pd.MultiIndex.from_tuples(
             [(actor, year)],
@@ -603,127 +599,6 @@ class SPS:
             raise ValueError("Method must be 'nw' or 'boot'.")
 
 
-    def predict_all(self,
-                    method: str = 'nw',
-                    delta: int | None = None,
-                    dims: list[str] | None = None,
-                    extra: pd.DataFrame | None = None,
-                    return_samples: bool = False) -> Union['SPS', Tuple['SPS', List[np.ndarray]]]:
-        """
-        Chainable wrapper for batch predictions of all valid actor-years.
-
-        Parameters
-        ----------
-        method : {'nw', 'boot'}, default='nw'
-        delta : int, optional
-            Forecast horizon; defaults to self.delta_t.
-        dims : list[str], optional
-            Dimensions to include; defaults to self.dimensions.
-        extra : pd.DataFrame, optional
-            Additional state entries to append before prediction.
-        return_samples : bool, default=False
-            For 'boot', whether to return list of sample matrices.
-
-        Returns
-        -------
-        self : SPS
-            The instance with `nw_full` or `boot_full` set.
-        samples_list : list[np.ndarray], optional
-            List of bootstrap sample matrices (if `return_samples=True`).
-        """
-        if delta is None:
-            delta = self.delta_t
-        
-        if dims is None:
-            dimes = self.dimensions
-
-        # Insert eventual `extra` trajectories in self.state_matrix
-        original = self.state_matrix
-        if extra is not None:
-            # Check extra is a MultiIndex (actor, year)
-            if not isinstance (extra.index, pd.MultiIndex) or extra.index.names != ['actor', 'year']:
-                raise ValueError("`extra` must be a MultiIndex with names=['actor','year']")
-            
-            # Check that extra has the same keys of data_dfs
-            missing = set(self.dimensions) - set(extra.columns)
-            if missing:
-                raise ValueError(f"'extra' misses dimension {missing}")
-            
-            # Align extra on every actor, year and dimension
-            full_idx = pd.MultiIndex.from_product(
-                [self.actors, self.years],
-                names=['actor','year']
-            )
-            e = extra.copy().reindex(index=full_idx, columns=self.dimensions)
-            
-            # Replace inf with NaNs
-            e = e.replace([np.inf, -np.inf], np.nan)
-            # Concatenate the extra trajectory to the state_matrix
-            self.state_matrix = pd.concat([original, e]).sort_index()    
-
-        # Generate the list of valid actors and years (using updated state_matrix)
-        indices = self.state_matrix.index
-        valid_keys = [
-            (actor, year)
-            for actor, year in indices
-            if (actor, year + delta) in self.state_matrix.index
-        ]
-
-        # each "row" stores the result for _nad_wat_regression or _bootstrap_regression 
-        # for that particular pair (actor, year)
-        rows = []
-        if return_samples: samples_list = []
-
-        for actor, year in valid_keys:
-            if method == 'nw':
-                nw_avg, nw_var, nw_pred, wgt, dX = self._nad_wat_regression(actor, year, delta, dims)
-                row = {
-                    'actor':   actor,
-                    'year':    year,
-                    'nw_avg':  nw_avg,
-                    'nw_var':  nw_var,
-                    'nw_pred': nw_pred,
-                    'weights': wgt,
-                    'dX':      dX
-                }
-            elif method == 'boot':
-                if return_samples:
-                    boot_avg, boot_var, boot_pred, wgt, dX, samples = \
-                        self._bootstrap_regression(actor, year, delta, dims, return_samples=True)
-                    samples_list.append(samples)
-                else:
-                    boot_avg, boot_var, boot_pred, wgt, dX = \
-                        self._bootstrap_regression(actor, year, delta, dims, return_samples=False)
-
-                row = {
-                    'actor':    actor,
-                    'year':     year,
-                    'boot_avg': boot_avg,
-                    'boot_var': boot_var,
-                    'boot_pred':boot_pred,
-                    'weights':  wgt,
-                    'dX':       dX
-                }
-            else:
-                raise ValueError("Method must be 'nw' or 'boot'.")
-
-            rows.append(row)
-
-        # If extra were add now remove it from the state matrix
-        if extra is not None:
-            self.state_matrix = original
-
-        # Create the final df containg also features from extra trajectories if present
-        df = pd.DataFrame(rows).set_index(['actor', 'year'])
-
-        # Assign to the crrect field and returns self (and samples)
-        if method == 'nw':
-            self.nw_full = df
-            return self
-        else:
-            self.boot_full = df
-            return (self, samples_list) if return_samples else self
-
     def _velocity_predict(self,
                            actor: str,
                            year: int,
@@ -744,108 +619,62 @@ class SPS:
 
         Returns
         -------
-        vel_avg : np.ndarray
-            Mean velocity-based displacement over `delta` horizon.
-        vel_var : np.ndarray
-            Variance of velocity-based estimates.
+        delta_vel : np.ndarray
+            velocity computed as most (recent value - value delta steps ago) / delta
+        sigma_vel : np.ndarray
+            Variance of the estimated velocity, computed as the sample variance of 
+            the one-year displacements and scaled by the horizon delta.
 
         Raises
         ------
         ValueError
-            If insufficient history (<2 points) to compute velocity.
+            If the observations at year-delta or year are NaN.
+            If the actor has insufficient history for velocity computation.
         """
         delta = delta or self.delta_t
         dims = dims or self.dimensions
 
-        # extract historical values for 'actor' up to `year`
-        hist = self.state_matrix.loc[actor].sort_index(level='year')  # DataFrame years x dims
-        years = hist.index.get_level_values('year').unique()
-        valid_years = years[years <= year]
-        if len(valid_years) < 2:
-            raise ValueError(f"Not enough history to compute velocity for {actor} at {year}.")
+        # Get actor's trajectory 
+        history = (
+            self.state_matrix
+                .loc[actor]
+                .sort_index(level='year')
+        )
+        years = history.index.get_level_values('year').astype(int).values
+        
+        # Restrict to years ≤ target
+        mask = years <= year
+        yrs = years[mask]
 
-        # compute velocities (first differences)
-        vals = hist.loc[:, dims].astype(float).values
-        vel = np.diff(vals, axis=0)
+        # Extract values for the relevant years
+        vals = history.values[mask]
 
-        # estimate mean and var of velocity over delta steps
-        # use velocities from last `delta` differences if available, else all
-        if len(vel) >= delta:
-            window = vel[-delta:]
-        else:
-            window = vel
-        vel_avg = window.mean(axis=0) * delta
-        vel_var = window.var(axis=0, ddof=1) * delta
+        # Check delta-year observation
+        if np.isnan(vals[-delta]).any():
+            raise ValueError(f"Cannot compute velocity: observation at {year-delta} for actor='{actor}'")
 
-        return vel_avg, vel_var
-    
-    def with_velocity_correction(self,
-                                  method: str = 'nw',
-                                  delta: int | None = None,
-                                  dims: list[str] | None = None)-> 'SPS':
-        """
-        Chainable correction based on velocity: combines base prediction with
-        velocity-based estimate using MLE.
+        # Check target-year observation
+        if np.isnan(vals[-1]).any():
+            raise ValueError(f"Cannot compute velocity: observation at {year} for actor='{actor}'")
 
-        Parameters
-        ----------
-        method : {'nw', 'boot'}, default='nw'
-        delta : int, optional
-            Forecast horizon; defaults to self.delta_t.
-        dims : list[str], optional
-            Dimensions to include; defaults to self.dimensions.
+        # Compute velocity over the horizon directly as (most recent value − value delta steps ago) / delta
+        delta_vel = (vals[-1] - vals[-delta]) / delta
 
-        Returns
-        -------
-        self : SPS
-            The instance with added 'corr_pred' and 'corr_var' columns in
-            the relevant prediction attribute.
+        # Identify which adjacent entries in `yrs` are exactly one year apart
+        consecutive = np.diff(yrs) == 1      
+        if not np.any(consecutive):
+            raise ValueError(f"Insufficient history for velocity computation: actor='{actor}' at year={year}.")  
 
-        Raises
-        ------
-        ValueError
-            If no base prediction found before correction.
-        """
-        delta = delta or self.delta_t
-        dims  = dims  or self.dimensions
+        # Compute the valid one-year displacements
+        one_year_disp = vals[1:][consecutive]- vals[:-1][consecutive]
 
-        # determina contesto: full vs single actor
-        if method == 'nw':
-            target_full = self.nw_full is not None
-            df = (self.nw_full.copy()  if target_full else
-                  self.nw_actor.copy() if self.nw_actor is not None else None)
-            mean_col, var_col = 'nw_pred', 'nw_var'
-            attr_full, attr_actor = 'nw_full', 'nw_actor'
-        elif method == 'boot':
-            target_full = self.boot_full is not None
-            df = (self.boot_full.copy()  if target_full else
-                  self.boot_actor.copy() if self.boot_actor is not None else None)
-            mean_col, var_col = 'boot_avg', 'boot_var'
-            attr_full, attr_actor = 'boot_full', 'boot_actor'
-        else:
-            raise ValueError("Method must be 'nw' or 'boot'.")
-        if df is None:
-            raise ValueError("No base prediction found. Run predict_all or predict_actor first.")
+        # Sample variance of those displacements, scaled by the horizon delta
+        sigma_vel = one_year_disp.var(axis=0, ddof=1) * delta
 
-        corr_means, corr_vars = [], []
-        # itera su righe
-        for (actor, year), row in df.iterrows():
-            m1, v1 = row[mean_col], row[var_col]
-            m2, v2 = self._velocity_predict(actor, year, delta, dims)
-            inv1, inv2 = np.reciprocal(v1), np.reciprocal(v2)
-            cvar = np.reciprocal(inv1 + inv2)
-            cmean = cvar * (m1 * inv1 + m2 * inv2)
-            corr_means.append(cmean)
-            corr_vars.append(cvar)
+        return delta_vel, sigma_vel
 
-        df['corr_pred'] = corr_means
-        df['corr_var']  = corr_vars
 
-        # aggiorna attributo corretto
-        setattr(self, attr_full if target_full else attr_actor, df)
-        return self
-
-    def predict_velocity(self,
+    def get_velocity(self,
                               actor: str,
                               year: int,
                               delta: int | None = None,
@@ -867,9 +696,9 @@ class SPS:
         Returns
         -------
         vel_avg : np.ndarray
-            Mean velocity-based displacement.
+            Mean velocity displacement.
         vel_var : np.ndarray
-            Variance of velocity-based estimates.
+            Variance of estimated velocity.
         """
         delta = delta or self.delta_t
         dims  = dims  or self.dimensions

@@ -1,6 +1,6 @@
 [project]
 name = "fermi-cref"
-version = "0.1.9"
+version = "0.2.0"
 description = "the FitnEss, the Relatedness, and other MetrIcs"
 readme = "README.md"
 license = {text = "MIT"}

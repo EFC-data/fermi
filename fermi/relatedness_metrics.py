@@ -4,14 +4,10 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 from tqdm import trange
-from typing import Union, List, Tuple, Any, Optional
+from typing import Union, List, Tuple, Any, Dict, Optional
 from pathlib import Path
 import pandas as pd
 from scipy.sparse import csr_matrix, lil_matrix
-
-# BICM library
-from bicm import BipartiteGraph
-from bicm.network_functions import sample_bicm
 
 # Bokeh - core functions
 import bokeh
@@ -31,10 +27,11 @@ from bokeh.palettes import Spectral4
 from networkx.algorithms import bipartite
 
 from fermi.matrix_processor import MatrixProcessorCA
+from fermi.null_models import NullModelSpec, fit_null_model, sample_null_model
 
 class RelatednessMetrics(MatrixProcessorCA):
     """
-    Main relatedness methods for binary matrices, with optional statistical validation.
+    Relatedness methods for bipartite matrices, with statistical validation.
 
     This class provides tools to compute and validate projection networks
     derived from a binary (typically sparse) matrix.
@@ -53,7 +50,7 @@ class RelatednessMetrics(MatrixProcessorCA):
         - Direct thresholding
 
     Additional functionality
-        - BICM sampling for statistical validation of projections
+        - WBNM sampling for binary or weighted null-model validation
         - Matrix visualization with customizable sorting
         - Support for sparse matrices, configurable initial conditions,
           and custom row/column labels
@@ -565,20 +562,33 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported method {projection_method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
 
-    def get_bicm_projection(self, alpha: float = 0.05, num_iterations: int = 10000, projection_method: Optional[str] = None, rows: bool = True, second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None, validation_method: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
+    def get_null_model_projection(
+        self,
+        alpha: float = 0.05,
+        num_iterations: int = 10000,
+        projection_method: Optional[str] = None,
+        rows: bool = True,
+        second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None,
+        validation_method: Optional[str] = None,
+        null_model: NullModelSpec = "bicm",
+        solve_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[str] = None,
+        seed: Optional[int] = None,
+        verbose: bool = False,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Perform BICM sampling and statistically validate a projection network.
+        Validate a projection by sampling a null model from ``wbnm``.
 
-        This method generates BICM samples to build a null distribution for
-        a chosen one-mode projection, then applies a multiple‐comparison
-        correction or threshold to identify significant links.
+        This method fits one of the WBNM models, builds a Monte Carlo null
+        distribution for a chosen projection, and applies a multiple-testing
+        correction or direct threshold.
 
         Parameters
         ----------
         alpha : float, default=0.05
             Significance level for validation (p-value threshold).
         num_iterations : int, default=10000
-            Number of BICM random samples to generate.
+            Number of null-model random samples to generate.
         projection_method : {'cooccurrence', 'proximity', 'taxonomy', 'assist'}, optional
             Projection algorithm to apply:
             - 'cooccurrence' : raw cooccurrence counts.
@@ -594,13 +604,26 @@ class RelatednessMetrics(MatrixProcessorCA):
             - 'bonferroni' : Bonferroni correction.
             - 'fdr'        : False Discovery Rate.
             - 'direct'     : direct p-value threshold at `alpha`.
+        null_model : str or BipartiteModel subclass, default='bicm'
+            One of ``'bicm'``, ``'biwcm'``, ``'biecm'``, ``'bipecm'`` or
+            ``'bicrema'`` (case-insensitive), or a WBNM model class. BiCM
+            samples binary networks; the remaining models sample weights.
+        solve_kwargs : dict, optional
+            Keyword arguments forwarded to each model's ``solve`` method.
+        device : str, optional
+            PyTorch device used by WBNM.
+        seed : int, optional
+            Seed for reproducible sampling.
+        verbose : bool, default=False
+            Display Monte Carlo progress when True.
 
         Returns
         -------
         validated_relatedness : ndarray
             Binary matrix (0/1) indicating which links are significant.
-        p_values : ndarray
-            Matrix of p-values from the validation step.
+        validated_values : ndarray
+            Matrix containing p-values at validated positions and zeros
+            elsewhere. This is not the complete unfiltered p-value matrix.
 
         Raises
         ------
@@ -608,6 +631,10 @@ class RelatednessMetrics(MatrixProcessorCA):
             If `projection_method` or `validation_method` is missing or unsupported,
             or if `second_matrix` is required but not provided.
         """
+        if self._processed is None:
+            raise ValueError("No matrix loaded. Call load() before projection validation.")
+        if num_iterations <= 0:
+            raise ValueError("num_iterations must be a positive integer.")
         if validation_method is None:
             raise ValueError("Validation method must be specified. Choose from: bonferroni, fdr, direct.")
         elif validation_method not in ["bonferroni", "fdr", "direct"]:
@@ -618,38 +645,80 @@ class RelatednessMetrics(MatrixProcessorCA):
             raise ValueError(
             f"Unsupported projection method {projection_method}. Choose from: cooccurrence, proximity, taxonomy, assist.")
         
-        original_bipartite = self._processed.copy()
-        empirical_projection = self.get_projection(second_matrix=second_matrix, rows=rows, projection_method=projection_method)
+        original_bipartite = self._processed.copy().tocsr()
+        second_sparse = None if second_matrix is None else csr_matrix(second_matrix)
+        empirical_projection = self.get_projection(
+            second_matrix=second_sparse,
+            rows=rows,
+            projection_method=projection_method,
+        ).toarray()
 
-        my_graph = BipartiteGraph()
-        my_graph.set_biadjacency_matrix(self._processed)
-        my_probability_matrix = my_graph.get_bicm_matrix()
+        fitted_model, row_mask, col_mask = fit_null_model(
+            original_bipartite,
+            model=null_model,
+            solve_kwargs=solve_kwargs,
+            device=device,
+        )
+        self.null_model_ = fitted_model
 
         shape = empirical_projection.shape
         pvalues_matrix = np.zeros(shape, dtype=float)
 
+        second_fitted_model = None
+        second_row_mask = None
+        second_col_mask = None
         if projection_method == "assist":
-            second_network = BipartiteGraph()
-            second_network.set_biadjacency_matrix(second_matrix)
-            other_probability_matrix = second_network.get_bicm_matrix()
+            second_fitted_model, second_row_mask, second_col_mask = fit_null_model(
+                second_sparse,
+                model=null_model,
+                solve_kwargs=solve_kwargs,
+                device=device,
+            )
 
-            for _ in trange(num_iterations):
-                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                second_sample = csr_matrix(sample_bicm(other_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(second_matrix=second_sample, rows=rows, projection_method=projection_method).toarray()>=empirical_projection, 1,0))
+        try:
+            for iteration in trange(num_iterations, disable=not verbose):
+                iteration_seed = None if seed is None else seed + iteration
+                sampled = sample_null_model(
+                    fitted_model,
+                    original_bipartite.shape,
+                    row_mask,
+                    col_mask,
+                    seed=iteration_seed,
+                )
+                self._processed = csr_matrix(sampled)
 
-        else:
-            for _ in trange(num_iterations):
-                self._processed = csr_matrix(sample_bicm(my_probability_matrix))
-                pvalues_matrix = np.add(pvalues_matrix,np.where(self.get_projection(rows=rows, projection_method=projection_method).toarray()>=empirical_projection, 1, 0))
+                second_sample = None
+                if projection_method == "assist":
+                    second_sample = csr_matrix(
+                        sample_null_model(
+                            second_fitted_model,
+                            second_sparse.shape,
+                            second_row_mask,
+                            second_col_mask,
+                            seed=None if iteration_seed is None else iteration_seed + num_iterations,
+                        )
+                    )
+
+                sampled_projection = self.get_projection(
+                    second_matrix=second_sample,
+                    rows=rows,
+                    projection_method=projection_method,
+                ).toarray()
+                pvalues_matrix += sampled_projection >= empirical_projection
+        finally:
+            self._processed = original_bipartite
 
         # after the iterations, we normalize the p-values matrix
         pvalues_matrix = pvalues_matrix / num_iterations
 
-        self._processed = original_bipartite  # reset class network
-
+        symmetric = projection_method != "assist"
         if projection_method == "assist":
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
+            positionvalidated, _, _ = self._validation_threshold(
+                pvalues_matrix,
+                alpha,
+                validation_method=validation_method,
+                symmetry=False,
+            )
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
@@ -661,7 +730,12 @@ class RelatednessMetrics(MatrixProcessorCA):
             return validated_relatedness, validated_values
 
         else:
-            positionvalidated, pvvalidated, pvthreshold = self._validation_threshold(pvalues_matrix, alpha, validation_method=validation_method)
+            positionvalidated, _, _ = self._validation_threshold(
+                pvalues_matrix,
+                alpha,
+                validation_method=validation_method,
+                symmetry=symmetric,
+            )
             validated_relatedness = np.zeros_like(pvalues_matrix, dtype=int)
             validated_values = np.zeros_like(pvalues_matrix)
 
@@ -673,6 +747,34 @@ class RelatednessMetrics(MatrixProcessorCA):
                 validated_values[cols_idx, rows_idx] = pvalues_matrix[rows_idx, cols_idx]
 
             return validated_relatedness, validated_values
+
+    def get_bicm_projection(
+        self,
+        alpha: float = 0.05,
+        num_iterations: int = 10000,
+        projection_method: Optional[str] = None,
+        rows: bool = True,
+        second_matrix: Optional[Union[np.ndarray, sp.spmatrix]] = None,
+        validation_method: Optional[str] = None,
+        solve_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[str] = None,
+        seed: Optional[int] = None,
+        verbose: bool = False,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Backward-compatible wrapper using WBNM's :class:`~wbnm.BiCM`."""
+        return self.get_null_model_projection(
+            alpha=alpha,
+            num_iterations=num_iterations,
+            projection_method=projection_method,
+            rows=rows,
+            second_matrix=second_matrix,
+            validation_method=validation_method,
+            null_model="bicm",
+            solve_kwargs=solve_kwargs,
+            device=device,
+            seed=seed,
+            verbose=verbose,
+        )
 
     ##############################################################
     #########      Static methods for graph plotting     #########

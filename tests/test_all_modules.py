@@ -1,22 +1,40 @@
 import numpy as np
+import warnings
 from scipy.sparse import csr_matrix
 from fermi import (
-    RawMatrixProcessor,
-    ComparativeAdvantage,
+    MatrixProcessorCA,
     efc,
     RelatednessMetrics,
     ECPredictor,
     ValidationMetrics,
 )
 
-def test_raw_matrix_processor_init():
-    processor = RawMatrixProcessor()
+def test_matrix_processor_init():
+    processor = MatrixProcessorCA()
     assert processor is not None
 
-def test_comparative_advantage_processor_init():
+def test_matrix_processor_load():
     dummy_matrix = csr_matrix([[1, 0], [0, 1]])
-    processor = ComparativeAdvantage(dummy_matrix)
-    assert processor is not None
+    processor = MatrixProcessorCA().load(dummy_matrix)
+    assert processor.get_matrix().shape == (2, 2)
+
+
+def test_compute_rca_handles_empty_rows_and_columns_without_warning():
+    matrix = csr_matrix(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        result = MatrixProcessorCA().load(matrix).compute_rca().get_matrix(dense=True)
+
+    assert np.isfinite(result).all()
+    assert np.count_nonzero(result[2, :]) == 0
+    assert np.count_nonzero(result[:, 2]) == 0
 
 def test_fitness_complexity_engine_init():
     dummy_matrix = csr_matrix([[1, 0], [1, 1]])
@@ -38,4 +56,3 @@ def test_validation_metrics_init():
     P = np.array([[0.2, 0.8], [0.9, 0.1]])
     metrics = ValidationMetrics(M, P)
     assert metrics is not None
-

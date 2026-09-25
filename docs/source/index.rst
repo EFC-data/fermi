@@ -1,68 +1,54 @@
-.. fermi documentation master file, created by
-   sphinx-quickstart on Tue May 27 10:59:50 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Fermi documentation
+===================
 
-Welcome to fermi’s documentation!
-=================================
-`fermi` is a modular Python framework for analyzing the main Economic Complexity metrics and features.
-It provides tools to explore the hidden structure of economies through:
+**Fermi** (FitnEss, Relatedness, and other MetrIcs) is a Python toolkit for
+economic-complexity analysis on bipartite matrices. It provides sparse matrix
+preprocessing, comparative-advantage transformations, Fitness--Complexity and
+ECI/PCI metrics, relatedness networks, statistical validation through WBNM
+null models, forecasting, and prediction evaluation.
 
-- 📊 **Matrix preprocessing**: raw cleaning, sparse conversion, Comparative advantage RCA/ICA, transformation and thresholding.
-- 🧠 **Fitness & complexity**: compute Fitness, Complexity ECI, PCI and other metrics via multiple methods.
-- 🌐 **Relatedness metrics**: product space, taxonomy, assist matrix.
-- 📈 **Prediction models**: GDP forecasting, density models, XGBoost.
-- ✅ **Validation metrics**: AUC, confusion matrix, prediction@k.
+The distribution is named ``fermi-cref``; the import package is ``fermi``::
 
+   import fermi
+   print(fermi.__version__)
 
-Basic functionalities: Fitness and Complexity module
-====================================================
+Fermi 0.2 uses :mod:`wbnm` for all supported bipartite null models. This
+includes the binary :class:`wbnm.BiCM` as well as the weighted models
+:class:`wbnm.BiWCM`, :class:`wbnm.BiECM`, :class:`wbnm.BiPECM`, and
+:class:`wbnm.BiCReMA`.
 
+Start here
+----------
 
-The main module to generate an Economic Complexity object and initialize it (with a biadjacency matrix):
-
-    import fermi
-    myefc = fermi.efc()
-    myefc.load(my_biadjacency_matrix, *possible kwargs*)
-
-To compute the Revealed Comparative Advantage (Balassa index) and binarize its value
-
-    myefc.compute_rca().binarize()
-
-To compute the Fitness and the Complexity (using the original [Tacchella2012] algorithm)
-
-    fitness, complexity = myefc.get_fitness_complexity()
-
-To compute the diversification and the ubiquity
-
-    div, ubi = myefc.get_diversification_ubiquity()
-
-To compute the ECI index (using the eigenvalue method)
-
-    eci, pci = myefc.get_eci_pci()
-
-
-Basic functionalities: Relatedness module
-=========================================
-The module to generate cooccurrences and similar relatedness measures is
-
-    myproj = fermi.RelatednessMetrics()
-    myproj.load(my_biadjacency_matrix, *possible kwargs*)
-
-The cooccurrence can be evaluated using
-
-    relatedness = myproj.get_projection(projection_method="cooccurrence")
-    validated_relatedness, validated_values = myproj.get_bicm_projection(projection_method="cooccurrence", validation_method="fdr")
-
+* :doc:`installation` explains installation, upgrades, and verification.
+* :doc:`quickstart` gives an end-to-end working example.
+* :doc:`data_and_preprocessing` documents accepted data and ICA/RCA.
+* :doc:`null_models` explains how to choose a binary or weighted null model.
+* :doc:`api` is the generated API reference.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User guide
+
+   installation
+   quickstart
+   data_and_preprocessing
+   null_models
+   economic_complexity
+   relatedness
+   prediction
+   validation
+   migration
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
 
    api
+   references
 
-Indices and tables
-==================
+Indices
+-------
 
 * :ref:`genindex`
 * :ref:`modindex`

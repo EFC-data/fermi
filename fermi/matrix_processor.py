@@ -2,10 +2,16 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from scipy.sparse import csr_matrix
-from bicm import BipartiteGraph
 import copy
+
+from fermi.null_models import (
+    NullModelSpec,
+    fit_null_model,
+    restore_matrix,
+    tensor_to_numpy,
+)
 
 class MatrixProcessorCA:
     """
@@ -49,7 +55,8 @@ class MatrixProcessorCA:
         Parameters
         ----------
         input_data : str or Path or DataFrame or ndarray or list
-            Path to file, DataFrame, numpy array, sparse matrix, or edge list.
+            Path to a supported matrix file, DataFrame, NumPy array,
+            two-dimensional list, or sparse matrix.
         **kwargs : dict
             Additional keyword arguments for file readers (e.g. sep, header).
 
@@ -101,13 +108,23 @@ class MatrixProcessorCA:
         # Compute the square root of the total sum of all matrix entries (used for normalization)
         val = np.sqrt(mat.sum().sum())
         
-        # Compute scaling vector for columns (products): val / col_sum
-        # where col_sum > 0 to avoid division by zero
-        s0 = np.divide(val, mat.sum(0), where=mat.sum(0) > 0)
-
-        # Compute scaling vector for rows (countries): val / row_sum
-        # where row_sum > 0 to avoid division by zero
-        s1 = np.divide(val, mat.sum(1), where=mat.sum(1) > 0)
+        # Compute scaling vectors only for non-empty rows and columns.  The
+        # explicit zero-filled outputs are important: without ``out``, NumPy
+        # leaves entries excluded by ``where`` uninitialized.
+        col_sums = np.asarray(mat.sum(axis=0), dtype=float)
+        row_sums = np.asarray(mat.sum(axis=1), dtype=float)
+        s0 = np.divide(
+            val,
+            col_sums,
+            out=np.zeros_like(col_sums),
+            where=col_sums > 0,
+        )
+        s1 = np.divide(
+            val,
+            row_sums,
+            out=np.zeros_like(row_sums),
+            where=row_sums > 0,
+        )
             
         # Compute RCA as: RCA[i,j] = mat[i,j] * s0[j] * s1[i]
         # Equivalent to: mat * (val / col_sum) * (val / row_sum)
@@ -116,43 +133,60 @@ class MatrixProcessorCA:
         self._processed = rca.tocsr()
         return self
 
-    def compute_ica(self) -> "MatrixProcessorCA":
+    def compute_ica(
+        self,
+        model: NullModelSpec = "biwcm",
+        solve_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[str] = None,
+    ) -> "MatrixProcessorCA":
         """
         Compute Inferred Comparative Advantage (ICA) and replace processed matrix.
 
-        Uses the Bipartite Weighted Configuration Model from the bicm module to obtain expected values
-        of the weighted network, used as expected value.
+        Fits a null model from the ``wbnm`` package and divides every observed
+        value by its expected value.  The default remains BiWCM, preserving the
+        historical definition of ICA, while any WBNM model can be selected.
+
+        Parameters
+        ----------
+        model : str or BipartiteModel subclass, default="biwcm"
+            One of ``"bicm"``, ``"biwcm"``, ``"biecm"``, ``"bipecm"`` or
+            ``"bicrema"`` (case-insensitive), or a WBNM model class. BiCM is
+            binary and binarizes weighted input; the other models preserve
+            model-specific weight constraints.
+        solve_kwargs : dict, optional
+            Keyword arguments forwarded to the model's ``solve`` method.
+        device : str, optional
+            PyTorch device used by WBNM, for example ``"cpu"`` or ``"cuda"``.
 
         Returns
         -------
         MatrixProcessorCA
             The instance itself, with `_processed` updated to ICA matrix.
         """
-        mat = self._processed
-        # check rows or columns zeros
-        row_sums = np.array(mat.sum(axis=1)).ravel()
-        col_sums = np.array(mat.sum(axis=0)).ravel()
-        row_mask = row_sums != 0
-        col_mask = col_sums != 0
-        submat = mat[row_mask][:, col_mask].tocsr()
+        if self._processed is None:
+            raise ValueError("No matrix loaded. Call load() before compute_ica().")
 
-        # compute the ica
-        graph = BipartiteGraph()
-        graph.set_biadjacency_matrix(submat.toarray())
-        graph.solve_tool(linsearch=True, verbose=False, print_error=False, model='biwcm_c')
-        avg = graph.get_bicm_matrix()
-        inv_avg = np.divide(np.ones_like(avg), avg, where=avg > 0)
-        inv_avg[inv_avg == np.inf] = 0
-        ica_sub = submat.multiply(sp.csr_matrix(inv_avg))
+        mat = self._processed.tocsr()
+        fitted_model, row_mask, col_mask = fit_null_model(
+            mat, model=model, solve_kwargs=solve_kwargs, device=device
+        )
+        self.null_model_ = fitted_model
 
-        # restore the original dimensions
-        coo = ica_sub.tocoo()
-        orig_rows = np.nonzero(row_mask)[0][coo.row]
-        orig_cols = np.nonzero(col_mask)[0][coo.col]
-        ica = csr_matrix((coo.data, (orig_rows, orig_cols)), shape=mat.shape)
+        if fitted_model is None:
+            self._processed = csr_matrix(mat.shape, dtype=float)
+            return self
 
-        # append
-        self._processed = ica
+        expected_compact = tensor_to_numpy(fitted_model.expected_matrix())
+        expected = restore_matrix(
+            expected_compact, mat.shape, row_mask=row_mask, col_mask=col_mask
+        )
+        inverse_expected = np.divide(
+            1.0,
+            expected,
+            out=np.zeros_like(expected, dtype=float),
+            where=expected > 0,
+        )
+        self._processed = mat.multiply(inverse_expected).tocsr()
         return self
 
     # -----------------------------
@@ -289,4 +323,3 @@ class MatrixProcessorCA:
             shape=(max(rows)+1, max(cols)+1)
             return sp.csr_matrix((vals,(rows,cols)), shape=shape)
         raise TypeError(f"Unsupported input type: {type(obj)}")
-

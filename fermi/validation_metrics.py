@@ -22,7 +22,7 @@ class ValidationMetrics:
     # ──────────────────────────────────────────────────────────────────
     def __init__(self, M, P):
         """
-        Inizialise the class TestingPredictions.
+        Initialize prediction validation.
         Parameters
         ----------
           - M : numpy.ndarray of 0/1 (int or bool)
@@ -402,4 +402,3 @@ class ValidationMetrics:
 
         sns.histplot(entropies)
         return entropies
-

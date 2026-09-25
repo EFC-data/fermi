@@ -1,7 +1,13 @@
 import numpy as np
 from scipy.sparse import diags, issparse, csr_matrix, spmatrix
-from bicm import BipartiteGraph
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
+
+from fermi.null_models import (
+    NullModelSpec,
+    fit_null_model,
+    restore_matrix,
+    tensor_to_numpy,
+)
 
 class ComparativeAdvantage:
     def __init__(self, mat: spmatrix, metric: str = 'rca') -> None:
@@ -63,10 +69,16 @@ class ComparativeAdvantage:
 
         return RCA
 
-    def compute_ica(self) -> spmatrix:
+    def compute_ica(
+        self,
+        model: NullModelSpec = "biwcm",
+        solve_kwargs: Optional[Dict[str, Any]] = None,
+        device: Optional[str] = None,
+    ) -> spmatrix:
         """
-        Computes the Inferred Compartive Advantage (ICA) matrix using the BipartiteGraph class.
-        ICA is computed as the element-wise division: ICA = mat / BICM.
+        Computes the Inferred Comparative Advantage (ICA) matrix using WBNM.
+        ICA is computed as the element-wise division of the observed matrix by
+        the expected matrix of the selected null model.
 
         To handle division by zero, the BICM matrix is converted to a dense array and zeros are
         replaced temporarily with 1 during division, then restored to 0.
@@ -76,21 +88,25 @@ class ComparativeAdvantage:
           - ICA: spmatrix  
               The computed ICA matrix as a sparse matrix
         """
-        myGraph = BipartiteGraph()
-        myGraph.set_biadjacency_matrix(self.mat)
-        BICM = myGraph.get_bicm_matrix()  # Expected to be a sparse matrix
+        fitted_model, row_mask, col_mask = fit_null_model(
+            self.mat, model=model, solve_kwargs=solve_kwargs, device=device
+        )
+        if fitted_model is None:
+            return csr_matrix(self.mat.shape, dtype=float)
 
-        # Convert to dense arrays for element-wise operations.
-        mat_dense = self.mat.toarray()
-        bicm_dense = BICM.toarray() if issparse(BICM) else np.array(BICM)
-
-        # Replace zeros in BICM to avoid division by zero.
-        safe_bicm_dense = np.where(bicm_dense == 0, 1, bicm_dense)
-        ica_dense = mat_dense / safe_bicm_dense
-        # Reset values to zero where BICM was originally zero.
-        ica_dense[bicm_dense == 0] = 0
-
-        return csr_matrix(ica_dense)
+        expected = restore_matrix(
+            tensor_to_numpy(fitted_model.expected_matrix()),
+            self.mat.shape,
+            row_mask,
+            col_mask,
+        )
+        inverse_expected = np.divide(
+            1.0,
+            expected,
+            out=np.zeros_like(expected, dtype=float),
+            where=expected > 0,
+        )
+        return self.mat.multiply(inverse_expected).tocsr()
 
     def compute_metric(self) -> Union[spmatrix, np.ndarray]:
         """

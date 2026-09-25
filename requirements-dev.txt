@@ -5,3 +5,4 @@
 pytest
 black
 ruff
+sphinx>=7.2

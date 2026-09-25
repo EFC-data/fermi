@@ -21,7 +21,7 @@ class ECPredictor:
     """
     def __init__(self, M, mode='network', model=None, normalize=False):
         """
-        Inizialize the ECPredictor with a binary bipartite matrix M and a prediction mode.
+        Initialize the predictor with a binary bipartite matrix and a mode.
 
         Parameters
         ----------

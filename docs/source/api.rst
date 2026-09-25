@@ -1,23 +1,52 @@
-API Reference
+API reference
 =============
 
-.. automodule:: fermi.matrix_processor
+This reference is generated from the public classes and functions in the
+source code. See the user-guide pages for workflows and model-selection
+guidance.
+
+Matrix preprocessing
+--------------------
+
+.. autoclass:: fermi.MatrixProcessorCA
    :members:
-   :undoc-members:
    :show-inheritance:
 
-.. automodule:: fermi.economic_fitness_complexity
+Economic complexity
+-------------------
+
+.. autoclass:: fermi.efc
    :members:
-   :undoc-members:
    :show-inheritance:
 
-.. automodule:: fermi.relatedness_metrics
+Relatedness
+-----------
+
+.. autoclass:: fermi.RelatednessMetrics
    :members:
-   :undoc-members:
    :show-inheritance:
 
-.. automodule:: fermi.prediction_module
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Prediction
+----------
 
+.. autoclass:: fermi.ECPredictor
+   :members:
+
+.. autoclass:: fermi.SPS
+   :members:
+
+Validation
+----------
+
+.. autoclass:: fermi.ValidationMetrics
+   :members:
+
+Null-model helpers
+------------------
+
+These helpers implement Fermi's adapter layer around WBNM. Most users should
+call ``compute_ica()`` or ``get_null_model_projection()`` instead.
+
+.. automodule:: fermi.null_models
+   :members:
+   :member-order: bysource

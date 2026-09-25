@@ -1,4 +1,4 @@
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 
 #from .raw_matrix_processor import RawMatrixProcessor
 from .matrix_processor import MatrixProcessorCA
@@ -7,5 +7,4 @@ from .economic_fitness_complexity import efc
 from .relatedness_metrics import RelatednessMetrics
 from .prediction_module import ECPredictor, SPS
 from .validation_metrics import ValidationMetrics
-
 

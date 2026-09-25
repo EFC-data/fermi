@@ -26,18 +26,17 @@ class efc(MatrixProcessorCA):
             input_data: Union[MatrixProcessorCA, str, Path, pd.DataFrame, np.ndarray, List[Any]] = None,
             **kwargs) -> None:
         """
-        Inizializes the efc class with a binary country-product matrix.
+        Initialize an economic-complexity analysis object.
 
         Parameters
         ----------
-          - matrix : csr_matrix
-              Binary country-product matrix (sparse format).
-          - hardcopy : bool, default True
-              If True, matrix is copied to avoid side effects.
-          - global_row_labels : list, optional
-              List of row labels (e.g. country names).
-          - global_col_labels : list, optional
-              List of column labels (e.g. product codes).
+        input_data : MatrixProcessorCA, path, DataFrame, ndarray or list, optional
+            Actor--activity matrix or an existing processor. DataFrame labels
+            are preserved. Metrics that require binary data expect the caller
+            to provide it or to apply ``compute_rca().binarize()`` first.
+        **kwargs : dict
+            Reader options forwarded to :meth:`MatrixProcessorCA.load` when
+            ``input_data`` is a file path.
 
         """
         super().__init__()
